@@ -4,6 +4,11 @@ name: Update Dependencies (non-breaking)
 # Pair this with update-dependencies-breaking.yml, which handles major version jumps on a
 # slower monthly cadence, so day-to-day updates stay small and frequent while breaking changes
 # get reviewed deliberately, once a month.
+#
+# Uses a PAT (see PAT_TOKEN below) instead of the default GITHUB_TOKEN. GitHub blocks the
+# default token from triggering your other workflows, to stop automation from looping into
+# itself, which means your repo's own pull_request CI would never run on the pull request this
+# opens. See _docs/faq-and-limitations.md for how to create the PAT.
 on:
   schedule:
     - cron: '0 2 * * 1'
@@ -28,4 +33,4 @@ jobs:
             npm run lint
           create-pull-request: true
           branch-name: update-dependencies/non-breaking
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}

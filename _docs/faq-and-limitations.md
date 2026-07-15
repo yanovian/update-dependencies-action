@@ -30,9 +30,41 @@ silently skipped.
 ## What happens if I don't give it any commands?
 
 `check-commands` is optional. With nothing in it, this Action updates dependencies and opens the
-pull request straight away, with nothing to gate on. If you have any tests, linters, or build
-steps at all, put them in `check-commands`, that's the whole point of running them before the
-pull request exists instead of after.
+pull request straight away, with nothing to gate on beforehand.
+
+That is a legitimate way to run it, not just a fallback. If your repo already runs CI on every
+pull request, you don't need to duplicate your whole test suite inside `check-commands`. Let this
+Action update dependencies and open the pull request, then let your existing pull request CI
+check it the same way it checks every other pull request. If something breaks, it breaks there,
+and you fix it in the pull request instead of paying for the same commands to run twice, once
+inside this Action and once again on the pull request itself.
+
+For your existing pull request CI to actually run on the pull request this Action opens, use a
+PAT, see the next question for why and how.
+
+## Why does the README recommend a PAT instead of the default token?
+
+GitHub deliberately stops the default `GITHUB_TOKEN` from triggering other workflows, including
+your repo's own `pull_request` checks, to prevent automation from looping into itself forever.
+That is fine if you use `check-commands` for everything, but it means the pull request this
+Action opens won't get your normal CI checks unless you give it a stronger token.
+
+The fix is a fine-grained personal access token (PAT):
+
+1. Go to **Settings → Developer settings → Personal access tokens → Fine-grained tokens** on
+   GitHub and generate a new token.
+2. Set repository access to only the repo (or repos) this Action runs against.
+3. Under repository permissions, grant **Contents: Read and write** and
+   **Pull requests: Read and write**. Nothing else is needed.
+4. Copy the token, then add it as a repo secret: **Settings → Secrets and variables → Actions →
+   New repository secret**. Name it `PAT_TOKEN`.
+5. Reference it in your workflow instead of the default token:
+
+```yaml
+github-token: ${{ secrets.PAT_TOKEN }}
+```
+
+The example workflows in the README and under `examples/workflows/` already use `PAT_TOKEN`.
 
 ## What happens if a command fails?
 

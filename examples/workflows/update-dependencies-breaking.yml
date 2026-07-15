@@ -5,6 +5,11 @@ name: Update Dependencies (breaking)
 # together, not AND'd, so it fires more often than intended), so this uses a fixed calendar day
 # instead, simple and predictable. Pair this with update-dependencies-non-breaking.yml for
 # weekly non-breaking updates the rest of the time.
+#
+# Uses a PAT (see PAT_TOKEN below) instead of the default GITHUB_TOKEN. GitHub blocks the
+# default token from triggering your other workflows, to stop automation from looping into
+# itself, which means your repo's own pull_request CI would never run on the pull request this
+# opens. See _docs/faq-and-limitations.md for how to create the PAT.
 on:
   schedule:
     - cron: '0 3 1 * *'
@@ -29,4 +34,4 @@ jobs:
             npm run lint
           create-pull-request: true
           branch-name: update-dependencies/breaking
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}

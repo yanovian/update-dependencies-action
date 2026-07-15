@@ -59,7 +59,7 @@ jobs:
             npm run lint
           create-pull-request: true
           branch-name: update-dependencies/non-breaking
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}
 ```
 
 Full copy: [`examples/workflows/update-dependencies-non-breaking.yml`](examples/workflows/update-dependencies-non-breaking.yml)
@@ -98,7 +98,7 @@ jobs:
             npm run lint
           create-pull-request: true
           branch-name: update-dependencies/breaking
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}
 ```
 
 Full copy: [`examples/workflows/update-dependencies-breaking.yml`](examples/workflows/update-dependencies-breaking.yml)
@@ -143,9 +143,7 @@ and updates the existing one.
 
 ## Permissions and tokens
 
-You don't need to create a token yourself. The default `GITHUB_TOKEN` that GitHub Actions
-provides works, as long as your workflow grants it permission to push a branch and open a pull
-request:
+Your workflow needs to grant these permissions either way:
 
 ```yaml
 permissions:
@@ -153,8 +151,22 @@ permissions:
   pull-requests: write
 ```
 
-The example workflows above already include this. Without it, the Action can still update
-dependencies and run your commands, it just can't push the branch or open the pull request.
+For `github-token`, use a fine-grained personal access token (PAT), not the default
+`GITHUB_TOKEN`. GitHub deliberately blocks the default token from triggering your repo's other
+workflows, to stop automation from looping into itself forever, which means your normal
+`pull_request` CI would never run on the pull request this Action opens. A PAT doesn't have that
+restriction.
+
+Create one under **Settings → Developer settings → Personal access tokens → Fine-grained tokens**,
+scoped to just this repo, with **Contents: Read and write** and **Pull requests: Read and write**
+permissions. Add it as a repo secret named `PAT_TOKEN`, then reference it like the example
+workflows above do:
+
+```yaml
+github-token: ${{ secrets.PAT_TOKEN }}
+```
+
+Full steps: [FAQ](_docs/faq-and-limitations.md#why-does-the-readme-recommend-a-pat-instead-of-the-default-token).
 
 ## Docs
 
