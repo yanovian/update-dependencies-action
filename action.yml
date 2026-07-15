@@ -11,7 +11,7 @@ inputs:
     required: false
     default: 'non-breaking'
   check-commands:
-    description: 'Commands to run after updating, one per line (an optional leading "- " is fine), in order. Every command must succeed or no pull request is created.'
+    description: 'Commands to run after updating, one per line, in order. Every command must succeed or no pull request is created.'
     required: false
     default: ''
   create-pull-request:

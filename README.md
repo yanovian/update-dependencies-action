@@ -54,9 +54,9 @@ jobs:
         with:
           update-strategy: non-breaking
           check-commands: |
-            - npm ci
-            - npm test
-            - npm run lint
+            npm ci
+            npm test
+            npm run lint
           create-pull-request: true
           branch-name: update-dependencies/non-breaking
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -93,9 +93,9 @@ jobs:
         with:
           update-strategy: breaking
           check-commands: |
-            - npm ci
-            - npm test
-            - npm run lint
+            npm ci
+            npm test
+            npm run lint
           create-pull-request: true
           branch-name: update-dependencies/breaking
           github-token: ${{ secrets.GITHUB_TOKEN }}

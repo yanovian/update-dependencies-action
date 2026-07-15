@@ -19,14 +19,6 @@ describe('parseCommands', () => {
       'npm run lint',
     ]);
   });
-
-  it('strips an optional leading "- " so check-commands can look like a list', () => {
-    expect(parseCommands('- npm test\n- npm run lint')).toEqual(['npm test', 'npm run lint']);
-  });
-
-  it('leaves a command that starts with a bare dash flag untouched', () => {
-    expect(parseCommands('-v')).toEqual(['-v']);
-  });
 });
 
 describe('runCommands', () => {

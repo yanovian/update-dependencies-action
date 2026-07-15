@@ -12,13 +12,10 @@ export interface CommandRunSummary {
   readonly failedCommand: string | null;
 }
 
-/** Each line may optionally start with "- " so `check-commands` can be written to look like a
- * list, even though GitHub Actions inputs are always plain strings under the hood, a real YAML
- * list under `with:` is not valid. */
 export function parseCommands(rawInput: string): string[] {
   return rawInput
     .split('\n')
-    .map((line) => line.trim().replace(/^-\s+/, ''))
+    .map((line) => line.trim())
     .filter((line) => line.length > 0 && !line.startsWith('#'));
 }
 

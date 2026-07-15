@@ -9,7 +9,7 @@ ecosystems and paths to skip.
 | Input | Default | What it does |
 | --- | --- | --- |
 | `update-strategy` | `non-breaking` | `non-breaking` keeps every package within its current major version. `breaking` allows major version jumps too. |
-| `check-commands` | (empty) | Commands to run after updating, one per line, in order. An optional leading `- ` on each line is fine if you want it to read like a list, GitHub Actions inputs are always plain strings, so this is really a multiline string either way. Every command must exit 0 or no pull request is created. Leave empty to skip straight to the pull request once dependencies are updated. |
+| `check-commands` | (empty) | Commands to run after updating, one per line, in order. Every command must exit 0 or no pull request is created. Leave empty to skip straight to the pull request once dependencies are updated. |
 | `create-pull-request` | `true` | Whether to open a pull request when there are updates and every command passed. Set to `false` to leave the updated files in the working tree instead, for example if you want to commit them yourself in a later step. |
 | `base-branch` | repo default branch | Branch the pull request is opened against. |
 | `branch-name` | `update-dependencies/<update-strategy>` | Branch this Action commits to. Re-running the workflow force-pushes the same branch and reuses the existing pull request instead of opening a new one. |
