@@ -10,23 +10,34 @@
 >
 > [Configuration →](_docs/configuration.md) · [Supported package managers →](_docs/supported-package-managers.md) · [FAQ →](_docs/faq-and-limitations.md)
 
-A GitHub Action that scans every package manager in your repo, npm, Yarn, pnpm, pip, Cargo, Go,
-Maven, Gradle, Bundler, Composer, and NuGet, and updates dependencies in each one it finds. You
-tell it which commands to run afterward, your unit tests, integration tests, linter, whatever you
-already have. It runs them one at a time and shows each one clearly in the Actions log. Only if
-every one of them passes does it open a pull request. If anything fails, nothing gets pushed and
-nothing gets opened.
+- **Scans every package manager in your repo, in one run.** npm, Yarn, pnpm, pip, Cargo, Go,
+  Maven, Gradle, Bundler, Composer, and NuGet, across every path in a monorepo, not just the root.
+- **Runs your own checks first.** Your unit tests, integration tests, linter, build, whatever you
+  already have, one at a time, clearly labeled in the Actions log.
+- **Opens a pull request only if every check passes.** If anything fails, nothing gets pushed and
+  nothing gets opened.
+- **Non-breaking by default, breaking on your own schedule.** Every change in the pull request is
+  labeled breaking or non-breaking based on the actual version jump, not just the mode you ran.
 
 ## Usage
 
-Save this as `.github/workflows/update-dependencies.yml` in your repo:
+The recommended setup is two workflows: frequent non-breaking updates, and breaking updates on a
+slower cadence so you have time to review them deliberately. `update-strategy: non-breaking` (the
+default) keeps every package within its current major version, the same as running `npm update`
+yourself. `update-strategy: breaking` allows major version jumps too, using each package
+manager's real update tooling wherever one exists.
+
+### Weekly non-breaking updates
+
+Save this as `.github/workflows/update-dependencies-non-breaking.yml`. Runs every Monday at
+02:00 UTC:
 
 ```yaml
-name: Update Dependencies
+name: Update Dependencies (non-breaking)
 
 on:
   schedule:
-    - cron: '0 6 * * 1' # every Monday at 06:00 UTC
+    - cron: '0 2 * * 1' # every Monday at 02:00 UTC
   workflow_dispatch:
 
 permissions:
@@ -47,27 +58,59 @@ jobs:
             - npm test
             - npm run lint
           create-pull-request: true
+          branch-name: update-dependencies/non-breaking
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-That's it. On the next scheduled run, or whenever you trigger it manually, it scans your repo,
-updates what it finds, runs your commands, and opens a pull request if they all pass.
+Full copy: [`examples/workflows/update-dependencies-non-breaking.yml`](examples/workflows/update-dependencies-non-breaking.yml)
 
-- Full copy of the workflow above: [`examples/workflows/update-dependencies.yml`](examples/workflows/update-dependencies.yml)
+### Monthly breaking updates
+
+Save this as `.github/workflows/update-dependencies-breaking.yml`. Runs at 03:00 UTC on the 1st
+of every month. Cron can't reliably express "the first Monday of the month" in one line (a
+day-of-month restriction and a day-of-week restriction get OR'd together, not AND'd, so it fires
+more often than intended), so this uses a fixed calendar day instead:
+
+```yaml
+name: Update Dependencies (breaking)
+
+on:
+  schedule:
+    - cron: '0 3 1 * *' # the 1st of every month at 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: yanovian/update-dependencies-action@v1
+        with:
+          update-strategy: breaking
+          check-commands: |
+            - npm ci
+            - npm test
+            - npm run lint
+          create-pull-request: true
+          branch-name: update-dependencies/breaking
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+Full copy: [`examples/workflows/update-dependencies-breaking.yml`](examples/workflows/update-dependencies-breaking.yml)
+
+### More
+
 - Every input: [`_docs/configuration.md`](_docs/configuration.md)
 - Skip an ecosystem or a path: copy [`examples/update-dependencies.config.yml`](examples/update-dependencies.config.yml)
   into `.github/update-dependencies.yml` and edit it.
 
-Don't trigger this on `pull_request`. See
+Don't trigger either workflow on `pull_request`. See
 [why in the FAQ](_docs/faq-and-limitations.md#can-i-trigger-this-on-pull_request).
-
-## Non-breaking vs breaking
-
-`update-strategy: non-breaking` (the default) keeps every package within its current major
-version, the same as running `npm update` yourself. `update-strategy: breaking` allows major
-version jumps too, using each package manager's real update tooling wherever one exists. Either
-way, the pull request tells you exactly which changes were breaking and which weren't, per
-package, not just per run.
 
 ## Supported package managers
 
@@ -110,7 +153,7 @@ permissions:
   pull-requests: write
 ```
 
-The example workflow above already includes this. Without it, the Action can still update
+The example workflows above already include this. Without it, the Action can still update
 dependencies and run your commands, it just can't push the branch or open the pull request.
 
 ## Docs

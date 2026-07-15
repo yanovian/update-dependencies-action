@@ -1,0 +1,32 @@
+name: Update Dependencies (breaking)
+
+# Runs at 03:00 UTC on the 1st of every month. Cron can't reliably express "the first Monday of
+# the month" in one line (a day-of-month restriction and a day-of-week restriction get OR'd
+# together, not AND'd, so it fires more often than intended), so this uses a fixed calendar day
+# instead, simple and predictable. Pair this with update-dependencies-non-breaking.yml for
+# weekly non-breaking updates the rest of the time.
+on:
+  schedule:
+    - cron: '0 3 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: yanovian/update-dependencies-action@v1
+        with:
+          update-strategy: breaking
+          check-commands: |
+            - npm ci
+            - npm test
+            - npm run lint
+          create-pull-request: true
+          branch-name: update-dependencies/breaking
+          github-token: ${{ secrets.GITHUB_TOKEN }}
