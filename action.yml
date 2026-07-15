@@ -1,0 +1,56 @@
+name: 'Update Dependencies'
+description: 'Scans every package manager in a repo, updates dependencies, runs your verification commands, and opens a PR only if they all pass'
+author: 'yanovian'
+branding:
+  icon: 'refresh-cw'
+  color: 'green'
+
+inputs:
+  update-strategy:
+    description: 'How far to update: non-breaking (stay within the current major version) or breaking (allow major version jumps)'
+    required: false
+    default: 'non-breaking'
+  commands:
+    description: 'Commands to run after updating, one per line, in order. Every command must succeed or no pull request is created.'
+    required: false
+    default: ''
+  create-pull-request:
+    description: 'Whether to open a pull request when updates are found and every command passes'
+    required: false
+    default: 'true'
+  base-branch:
+    description: 'Branch to base the pull request on. Defaults to the repository default branch.'
+    required: false
+    default: ''
+  branch-name:
+    description: 'Branch to commit updates to. Defaults to update-dependencies/<update-strategy>.'
+    required: false
+    default: ''
+  config-path:
+    description: 'Path to the config file in this repo for ignoring ecosystems or paths'
+    required: false
+    default: '.github/update-dependencies.yml'
+  working-directory:
+    description: 'Directory to scan, relative to the repository root'
+    required: false
+    default: '.'
+  github-token:
+    description: 'Token used to push the update branch and open the pull request'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  updated:
+    description: 'true if any dependency was updated'
+  pull-request-number:
+    description: 'Number of the pull request that was created or updated, if any'
+  pull-request-url:
+    description: 'URL of the pull request that was created or updated, if any'
+  changes-summary-path:
+    description: 'Path to the full JSON summary of changes written to disk'
+  commands-passed:
+    description: 'true if every command in `commands` exited successfully'
+
+runs:
+  using: 'node24'
+  main: 'dist/index.js'

@@ -1,0 +1,23 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # A release tag is always vX.Y.Z (has dots); the moving major tag (v1, v2, ...) never does.
+    # `make release-*` pushes both, so this skips the major tag push and only releases once.
+    if: contains(github.ref_name, '.')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" --generate-notes --latest

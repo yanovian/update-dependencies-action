@@ -1,0 +1,21 @@
+version: 1
+
+# Turn an ecosystem off if you don't want it touched, even if this Action finds it in the repo.
+# Anything not listed here is scanned automatically.
+ecosystems:
+  npm: true
+  yarn: true
+  pnpm: true
+  pip: true
+  cargo: true
+  go: true
+  maven: true
+  gradle: true
+  rubygems: true
+  composer: true
+  nuget: true
+
+# Path prefixes, relative to the repo root, that this Action should skip entirely.
+ignorePaths:
+  - examples
+  - test-fixtures
