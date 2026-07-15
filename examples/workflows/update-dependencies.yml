@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: yanovian/github-actions-update-dependencies@v1
+      - uses: yanovian/update-dependencies-action@v1
         with:
           update-strategy: ${{ inputs.update-strategy || 'non-breaking' }}
           check-commands: |

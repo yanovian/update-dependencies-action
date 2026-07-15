@@ -1,7 +1,7 @@
 import type { CommandResult } from '../commands/command-runner.js';
 import type { ManualNote, PackageChange, UpdateMode } from '../types/ecosystem-plugin.js';
 
-const ACTION_URL = 'https://github.com/yanovian/github-actions-update-dependencies';
+const ACTION_URL = 'https://github.com/yanovian/update-dependencies-action';
 
 export interface PrBodyOptions {
   readonly mode: UpdateMode;

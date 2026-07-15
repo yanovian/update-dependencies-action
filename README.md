@@ -1,8 +1,8 @@
 # 📦 Update Dependencies
 
-[![CI](https://github.com/yanovian/github-actions-update-dependencies/actions/workflows/ci.yml/badge.svg)](https://github.com/yanovian/github-actions-update-dependencies/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/yanovian/github-actions-update-dependencies)](https://github.com/yanovian/github-actions-update-dependencies/releases/latest)
-[![License: MIT](https://img.shields.io/github/license/yanovian/github-actions-update-dependencies)](LICENSE)
+[![CI](https://github.com/yanovian/update-dependencies-action/actions/workflows/ci.yml/badge.svg)](https://github.com/yanovian/update-dependencies-action/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/yanovian/update-dependencies-action)](https://github.com/yanovian/update-dependencies-action/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/yanovian/update-dependencies-action)](LICENSE)
 
 **Updates your dependencies, runs your tests, and only opens a pull request if everything still passes.**
 
@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: yanovian/github-actions-update-dependencies@v1
+      - uses: yanovian/update-dependencies-action@v1
         with:
           update-strategy: non-breaking
           check-commands: |

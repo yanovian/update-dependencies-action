@@ -1,5 +1,5 @@
 const USER_AGENT =
-  'github-actions-update-dependencies (https://github.com/yanovian/github-actions-update-dependencies)';
+  'update-dependencies-action (https://github.com/yanovian/update-dependencies-action)';
 
 interface CratesIoResponse {
   readonly crate?: { readonly max_stable_version?: string };

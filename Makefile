@@ -38,14 +38,14 @@ clean: ## Remove build artifacts
 	rm -rf dist coverage lib
 
 # dist/ is committed to the repo: GitHub runs dist/index.js directly for anyone using
-# `uses: yanovian/github-actions-update-dependencies@vX`, with no build step of their own. `pnpm
+# `uses: yanovian/update-dependencies-action@vX`, with no build step of their own. `pnpm
 # version` refuses to run against a dirty working tree, so the freshly built dist/ from `verify`
 # must be committed before it runs; this only creates a commit when dist/ actually changed.
 stage-dist:
 	git add dist
 	git diff --cached --quiet -- dist || git commit -m "chore: rebuild dist"
 
-# Consumers reference this Action as `uses: yanovian/github-actions-update-dependencies@v1`, a
+# Consumers reference this Action as `uses: yanovian/update-dependencies-action@v1`, a
 # moving major tag, not the exact `vX.Y.Z` release tag that `pnpm version` creates. Without this,
 # `@v1` never exists (or never advances past the first v1.0.0), and every consumer workflow fails
 # to resolve it. Force-moves the local and remote major tag to the commit just released.

@@ -1,5 +1,5 @@
 name: 'Update Dependencies'
-description: 'Scans every package manager in a repo, updates dependencies, runs your verification commands, and opens a PR only if they all pass'
+description: 'Scans every package manager in a repo, updates dependencies, and opens a PR only if your checks pass'
 author: 'yanovian'
 branding:
   icon: 'refresh-cw'

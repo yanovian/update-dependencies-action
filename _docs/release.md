@@ -14,7 +14,7 @@ That's it. [`.github/workflows/release.yml`](../.github/workflows/release.yml) p
 pushed tag and:
 
 - force-moves the major tag (for example `v1`) to point at the new release, so
-  `uses: yanovian/github-actions-update-dependencies@v1` keeps resolving to the latest release in
+  `uses: yanovian/update-dependencies-action@v1` keeps resolving to the latest release in
   that major series
 - creates the GitHub Release, titled with the version, using GitHub's auto-generated notes
   (commits and pull requests since the last tag)
