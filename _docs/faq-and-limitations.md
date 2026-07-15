@@ -29,10 +29,10 @@ silently skipped.
 
 ## What happens if I don't give it any commands?
 
-`commands` is optional. With nothing in it, this Action updates dependencies and opens the pull
-request straight away, with nothing to gate on. If you have any tests, linters, or build steps at
-all, put them in `commands`, that's the whole point of running them before the pull request
-exists instead of after.
+`check-commands` is optional. With nothing in it, this Action updates dependencies and opens the
+pull request straight away, with nothing to gate on. If you have any tests, linters, or build
+steps at all, put them in `check-commands`, that's the whole point of running them before the
+pull request exists instead of after.
 
 ## What happens if a command fails?
 

@@ -23,9 +23,9 @@ jobs:
       - uses: yanovian/github-actions-update-dependencies@v1
         with:
           update-strategy: ${{ inputs.update-strategy || 'non-breaking' }}
-          commands: |
-            npm ci
-            npm test
-            npm run lint
+          check-commands: |
+            - npm ci
+            - npm test
+            - npm run lint
           create-pull-request: true
           github-token: ${{ secrets.GITHUB_TOKEN }}

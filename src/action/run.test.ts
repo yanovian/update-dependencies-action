@@ -49,7 +49,7 @@ vi.mock('../core/plugins/all-plugins.js', () => ({ createAllPlugins: () => [] })
 vi.mock('./inputs.js', () => ({
   readActionInputs: () => ({
     updateStrategy: 'non-breaking',
-    commands: 'npm test',
+    checkCommands: 'npm test',
     createPullRequest: true,
     baseBranch: '',
     branchName: 'update-dependencies/non-breaking',

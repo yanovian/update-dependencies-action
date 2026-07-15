@@ -12,10 +12,13 @@ export interface CommandRunSummary {
   readonly failedCommand: string | null;
 }
 
+/** Each line may optionally start with "- " so `check-commands` can be written to look like a
+ * list, even though GitHub Actions inputs are always plain strings under the hood, a real YAML
+ * list under `with:` is not valid. */
 export function parseCommands(rawInput: string): string[] {
   return rawInput
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => line.trim().replace(/^-\s+/, ''))
     .filter((line) => line.length > 0 && !line.startsWith('#'));
 }
 
@@ -33,12 +36,15 @@ export async function runCommands(
 
   for (const [index, command] of commands.entries()) {
     const label = `Running command ${index + 1}/${commands.length}: ${command}`;
-    const exitCode = await logger.group(
-      label,
-      async () => (await runProcess(command, { cwd })).exitCode,
-    );
+    const exitCode = await logger.group(label, async () => {
+      logger.info(`$ ${command}`);
+      return (await runProcess(command, { cwd })).exitCode;
+    });
     results.push({ command, exitCode });
     if (exitCode !== 0) {
+      logger.error(
+        `Command ${index + 1}/${commands.length} failed (exit code ${exitCode}): ${command}`,
+      );
       return { results, allSucceeded: false, failedCommand: command };
     }
   }

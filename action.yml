@@ -10,8 +10,8 @@ inputs:
     description: 'How far to update: non-breaking (stay within the current major version) or breaking (allow major version jumps)'
     required: false
     default: 'non-breaking'
-  commands:
-    description: 'Commands to run after updating, one per line, in order. Every command must succeed or no pull request is created.'
+  check-commands:
+    description: 'Commands to run after updating, one per line (an optional leading "- " is fine), in order. Every command must succeed or no pull request is created.'
     required: false
     default: ''
   create-pull-request:
@@ -49,7 +49,7 @@ outputs:
   changes-summary-path:
     description: 'Path to the full JSON summary of changes written to disk'
   commands-passed:
-    description: 'true if every command in `commands` exited successfully'
+    description: 'true if every command in `check-commands` exited successfully'
 
 runs:
   using: 'node24'

@@ -72,7 +72,7 @@ async function verifyAndPublish(
   repoRoot: string,
   logger: Logger,
 ): Promise<void> {
-  const commandSummary = await runCommands(parseCommands(inputs.commands), repoRoot, logger);
+  const commandSummary = await runCommands(parseCommands(inputs.checkCommands), repoRoot, logger);
   const summaryPath = await writeSummaryToDisk(
     {
       mode: inputs.updateStrategy,

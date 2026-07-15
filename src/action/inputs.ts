@@ -3,7 +3,7 @@ import type { UpdateMode } from '../core/types/ecosystem-plugin.js';
 
 export interface ActionInputs {
   readonly updateStrategy: UpdateMode;
-  readonly commands: string;
+  readonly checkCommands: string;
   readonly createPullRequest: boolean;
   readonly baseBranch: string;
   readonly branchName: string;
@@ -19,7 +19,7 @@ export function readActionInputs(): ActionInputs {
 
   return {
     updateStrategy,
-    commands: core.getInput('commands'),
+    checkCommands: core.getInput('check-commands'),
     createPullRequest: core.getBooleanInput('create-pull-request'),
     baseBranch: core.getInput('base-branch'),
     branchName: core.getInput('branch-name') || `update-dependencies/${updateStrategy}`,
