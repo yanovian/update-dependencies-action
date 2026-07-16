@@ -1,6 +1,6 @@
 {
   "name": "update-dependencies",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "GitHub Action that scans every package manager in a repo, updates dependencies, and opens a PR, gated on checks if you give it any",
   "private": true,
   "license": "MIT",
