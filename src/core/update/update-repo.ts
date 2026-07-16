@@ -82,20 +82,31 @@ async function checkForUnexplainedChanges(
   const result = await runProcess(`git status --porcelain -- "${manifest.directory}"`, {
     cwd: repoRoot,
   });
-  if (result.stdout.trim().length === 0) {
+  const changedFiles = parsePorcelainFilePaths(result.stdout);
+  if (changedFiles.length === 0) {
     return null;
   }
 
   logger.warn(
-    `${manifest.ecosystem} dependencies in ${manifest.directory} changed on disk, but this ` +
-      'Action could not determine which package versions changed. Flagging for manual review.',
+    `${manifest.ecosystem} dependencies in ${manifest.directory} changed on disk (${changedFiles.join(', ')}), ` +
+      'but this Action could not determine which package versions changed. Flagging for manual review.',
   );
   return {
     ecosystem: manifest.ecosystem,
     path: manifest.directory,
     name: null,
     reason:
-      'Files here changed after updating, but this Action could not determine which package ' +
-      'versions changed. Review the diff manually before merging.',
+      `Files changed after updating: ${changedFiles.join(', ')}. This Action could not ` +
+      'determine which package versions changed. Review the diff manually before merging.',
   };
+}
+
+/** `git status --porcelain` lines are "XY path", XY being two status characters, sometimes a
+ * rename arrow ("old -> new"); only the path (or the renamed-to path) is useful here. */
+function parsePorcelainFilePaths(porcelainOutput: string): string[] {
+  return porcelainOutput
+    .split('\n')
+    .map((line) => line.slice(3).trim())
+    .filter((path) => path.length > 0)
+    .map((path) => path.split(' -> ').pop() ?? path);
 }

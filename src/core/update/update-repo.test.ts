@@ -86,8 +86,11 @@ describe('updateRepo', () => {
     expect(result.manualActionNeeded).toEqual([]);
   });
 
-  it('flags unexplained disk changes as a manual-action note instead of silently dropping them', async () => {
-    runProcessMock.mockResolvedValue({ exitCode: 0, stdout: ' M app/package-lock.json\n' });
+  it('flags unexplained disk changes as a manual-action note, naming the exact files changed', async () => {
+    runProcessMock.mockResolvedValue({
+      exitCode: 0,
+      stdout: ' M app/package-lock.json\n M app/package.json\n',
+    });
     const plugin: DependencyUpdatePlugin = {
       id: 'npm',
       language: 'JavaScript/TypeScript',
@@ -105,8 +108,15 @@ describe('updateRepo', () => {
 
     expect(result.changes).toEqual([]);
     expect(result.manualActionNeeded).toEqual([
-      expect.objectContaining({ ecosystem: 'npm', path: 'app', name: null }),
+      expect.objectContaining({
+        ecosystem: 'npm',
+        path: 'app',
+        name: null,
+        reason: expect.stringContaining('app/package-lock.json, app/package.json'),
+      }),
     ]);
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('app'));
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('app/package-lock.json, app/package.json'),
+    );
   });
 });

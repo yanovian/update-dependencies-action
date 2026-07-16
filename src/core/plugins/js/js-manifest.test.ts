@@ -1,5 +1,28 @@
-import { describe, expect, it } from 'vitest';
-import { detectJsManifests, detectNpmManifests } from './js-manifest.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Logger } from '../../logging/logger.js';
+
+const { readFileMock, runProcessMock } = vi.hoisted(() => ({
+  readFileMock: vi.fn(),
+  runProcessMock: vi.fn(),
+}));
+
+vi.mock('node:fs/promises', () => ({ readFile: readFileMock }));
+vi.mock('../../commands/run-process.js', () => ({ runProcess: runProcessMock }));
+
+const { detectJsManifests, detectNpmManifests, runJsUpdate } = await import('./js-manifest.js');
+
+const logger: Logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), group: (_name, fn) => fn() };
+const location = {
+  ecosystem: 'npm' as const,
+  language: 'JavaScript/TypeScript',
+  manifestPath: 'app/package.json',
+  directory: 'app',
+};
+
+beforeEach(() => {
+  readFileMock.mockReset();
+  runProcessMock.mockReset().mockResolvedValue({ exitCode: 0, stdout: '' });
+});
 
 describe('detectNpmManifests', () => {
   it('claims a package.json with no lockfile at all', () => {
@@ -41,5 +64,76 @@ describe('detectJsManifests', () => {
 
   it('finds nothing when the lockfile is absent', () => {
     expect(detectJsManifests(['app/package.json'], 'pnpm', 'pnpm-lock.yaml')).toEqual([]);
+  });
+});
+
+describe('runJsUpdate', () => {
+  function mockPackageJson(): void {
+    readFileMock.mockImplementation(async (filePath: string) =>
+      filePath.endsWith('package.json')
+        ? JSON.stringify({ dependencies: { 'left-pad': '^1.0.0', lodash: '^4.0.0' } })
+        : 'arbitrary lockfile contents',
+    );
+  }
+
+  it('does not warn when every declared dependency resolves', async () => {
+    mockPackageJson();
+    const resolveVersions = vi
+      .fn()
+      .mockReturnValueOnce(
+        new Map([
+          ['left-pad', '1.0.0'],
+          ['lodash', '4.0.0'],
+        ]),
+      )
+      .mockReturnValueOnce(
+        new Map([
+          ['left-pad', '1.1.0'],
+          ['lodash', '4.0.0'],
+        ]),
+      );
+
+    const result = await runJsUpdate({
+      ecosystem: 'npm',
+      location,
+      ctx: { repoRoot: '/repo', logger },
+      lockfileName: 'package-lock.json',
+      command: 'npm update',
+      resolveVersions,
+    });
+
+    expect(logger.warn).not.toHaveBeenCalled();
+    expect(result.changes).toEqual([
+      {
+        ecosystem: 'npm',
+        path: 'app',
+        name: 'left-pad',
+        fromVersion: '1.0.0',
+        toVersion: '1.1.0',
+        breaking: false,
+      },
+    ]);
+  });
+
+  it('warns with the unresolved names and a lockfile snippet when resolution comes back short', async () => {
+    mockPackageJson();
+    const resolveVersions = vi.fn().mockReturnValue(new Map());
+
+    await runJsUpdate({
+      ecosystem: 'npm',
+      location,
+      ctx: { repoRoot: '/repo', logger },
+      lockfileName: 'package-lock.json',
+      command: 'npm update',
+      resolveVersions,
+    });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Before update: resolved 0/2 declared dependencies'),
+    );
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('left-pad, lodash'));
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('arbitrary lockfile contents'),
+    );
   });
 });

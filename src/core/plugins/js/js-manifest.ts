@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { runProcess } from '../../commands/run-process.js';
 import { diffVersions } from '../../update/diff-versions.js';
+import type { Logger } from '../../logging/logger.js';
 import { readFileIfPresent } from '../../util/read-file-if-present.js';
 import type {
   EcosystemId,
@@ -81,22 +82,47 @@ export async function runJsUpdate(options: JsUpdateOptions): Promise<PluginUpdat
   const lockfileAbsPath = path.join(dir, lockfileName);
 
   const declared = await readDeclaredDependencies(manifestAbsPath);
-  const before = await readVersionsIfPresent(lockfileAbsPath, declared, resolveVersions);
+  const readOptions = { lockfileAbsPath, declared, resolveVersions, logger: ctx.logger };
+  const before = await readVersionsIfPresent({ ...readOptions, label: 'Before update' });
 
   await runProcess(command, { cwd: dir });
 
-  const after = await readVersionsIfPresent(lockfileAbsPath, declared, resolveVersions);
+  const after = await readVersionsIfPresent({ ...readOptions, label: 'After update' });
   return {
     changes: diffVersions(before, after, ecosystem, location.directory),
     manualActionNeeded: [],
   };
 }
 
-async function readVersionsIfPresent(
-  lockfileAbsPath: string,
-  declared: ReadonlyMap<string, string>,
-  resolveVersions: ResolveVersions,
-): Promise<Map<string, string>> {
+interface ReadVersionsOptions {
+  readonly lockfileAbsPath: string;
+  readonly declared: ReadonlyMap<string, string>;
+  readonly resolveVersions: ResolveVersions;
+  readonly logger: Logger;
+  readonly label: string;
+}
+
+/**
+ * Reads and parses the lockfile, and, if it resolved fewer of the declared dependencies than
+ * expected, logs enough of the lockfile's own shape (not just "0 changes found") to diagnose a
+ * lockfile format this Action's parser doesn't handle, rather than let that failure look
+ * identical to "nothing needed updating".
+ */
+async function readVersionsIfPresent(options: ReadVersionsOptions): Promise<Map<string, string>> {
+  const { lockfileAbsPath, declared, resolveVersions, logger, label } = options;
   const contents = await readFileIfPresent(lockfileAbsPath);
-  return contents ? resolveVersions(contents, declared) : new Map();
+  if (contents === null) {
+    return new Map();
+  }
+
+  const resolved = resolveVersions(contents, declared);
+  if (resolved.size < declared.size) {
+    const unresolved = [...declared.keys()].filter((name) => !resolved.has(name));
+    logger.warn(
+      `${label}: resolved ${resolved.size}/${declared.size} declared dependencies from ` +
+        `${path.basename(lockfileAbsPath)}. Unresolved: ${unresolved.join(', ')}. ` +
+        `Lockfile starts with: ${contents.slice(0, 400).replace(/\n/g, ' | ')}`,
+    );
+  }
+  return resolved;
 }
