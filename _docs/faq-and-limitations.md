@@ -23,6 +23,9 @@ Some things this Action finds are deliberately left alone rather than guessed at
   it means changing source code, not just a version number.
 - A Gradle dependency declared in a form this Action doesn't confidently recognize (a version
   variable, a map-style declaration it can't resolve).
+- A path where the update command changed files on disk but this Action couldn't tell which
+  package versions changed. This is still committed, since the update itself is real, but shows
+  up here instead of in the changes table so you know to check that diff yourself.
 
 These are listed in the pull request body so you know to look at them yourself, instead of being
 silently skipped.

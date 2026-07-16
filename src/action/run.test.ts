@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   setActionOutputs: vi.fn(),
   setFailed: vi.fn(),
   createBranch: vi.fn(),
-  commitAll: vi.fn(),
+  commit: vi.fn(),
   push: vi.fn(),
   createOrUpdatePullRequest: vi.fn(),
   findStalePullRequests: vi.fn(),
@@ -37,7 +37,7 @@ vi.mock('@actions/core', () => ({
 vi.mock('../core/git/git-client.js', () => ({
   createGitClient: () => ({
     createBranch: mocks.createBranch,
-    commitAll: mocks.commitAll,
+    commit: mocks.commit,
     push: mocks.push,
   }),
 }));
@@ -73,6 +73,12 @@ const CHANGE = {
   toVersion: '1.1.0',
   breaking: false,
 };
+const MANIFEST = {
+  ecosystem: 'npm' as const,
+  language: 'JavaScript/TypeScript',
+  manifestPath: 'package.json',
+  directory: '.',
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -105,9 +111,24 @@ describe('run', () => {
     );
   });
 
+  it('sets updated=true and still proceeds when there are only manual-action notes', async () => {
+    mocks.updateRepo.mockResolvedValue({
+      manifestsUpdated: [MANIFEST],
+      changes: [],
+      manualActionNeeded: [
+        { ecosystem: 'npm' as const, path: '.', name: null, reason: 'unexplained change' },
+      ],
+    });
+    mocks.runCommands.mockResolvedValue({ results: [], allSucceeded: true, failedCommand: null });
+
+    await run(logger);
+
+    expect(mocks.runCommands).toHaveBeenCalled();
+  });
+
   it('fails and never creates a pull request when a command fails', async () => {
     mocks.updateRepo.mockResolvedValue({
-      manifestsUpdated: [],
+      manifestsUpdated: [MANIFEST],
       changes: [CHANGE],
       manualActionNeeded: [],
     });
@@ -126,9 +147,9 @@ describe('run', () => {
     );
   });
 
-  it('commits, pushes, and opens a pull request when every command passes', async () => {
+  it('commits only the updated directories, pushes, and opens a pull request when every command passes', async () => {
     mocks.updateRepo.mockResolvedValue({
-      manifestsUpdated: [],
+      manifestsUpdated: [MANIFEST],
       changes: [CHANGE],
       manualActionNeeded: [],
     });
@@ -141,7 +162,7 @@ describe('run', () => {
     await run(logger);
 
     expect(mocks.createBranch).toHaveBeenCalledWith('chore/update-deps/non-breaking/2026-07-16');
-    expect(mocks.commitAll).toHaveBeenCalled();
+    expect(mocks.commit).toHaveBeenCalledWith(['.'], expect.any(String));
     expect(mocks.push).toHaveBeenCalledWith('chore/update-deps/non-breaking/2026-07-16');
     expect(mocks.findStalePullRequests).toHaveBeenCalledWith(
       'token',

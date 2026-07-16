@@ -1,3 +1,4 @@
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import * as core from '@actions/core';
 import { parseCommands, runCommands, type CommandResult } from '../core/commands/command-runner.js';
@@ -30,6 +31,13 @@ function createFullRegistry(): PluginRegistry {
   return registry;
 }
 
+/** GitHub Actions sets RUNNER_TEMP to a directory outside any checkout; falling back to the
+ * OS temp dir covers running this outside a GitHub-hosted runner. Never the repo itself: this
+ * file must never end up inside the working tree this Action commits from. */
+function summaryOutputDir(): string {
+  return process.env.RUNNER_TEMP ?? tmpdir();
+}
+
 export async function run(logger: Logger): Promise<void> {
   const inputs = readActionInputs();
   const repoRoot = path.join(
@@ -48,16 +56,16 @@ export async function run(logger: Logger): Promise<void> {
     logger,
   });
 
-  if (updateResult.changes.length === 0) {
+  if (updateResult.changes.length === 0 && updateResult.manualActionNeeded.length === 0) {
     logger.info('No dependency updates found.');
     const summaryPath = await writeSummaryToDisk(
       {
         mode: inputs.updateStrategy,
         changes: [],
-        manualActionNeeded: updateResult.manualActionNeeded,
+        manualActionNeeded: [],
         commands: [],
       },
-      repoRoot,
+      summaryOutputDir(),
     );
     setActionOutputs({ updated: false, changesSummaryPath: summaryPath, commandsPassed: true });
     return;
@@ -85,7 +93,7 @@ async function verifyAndPublish(
       manualActionNeeded: updateResult.manualActionNeeded,
       commands: commandSummary.results,
     },
-    repoRoot,
+    summaryOutputDir(),
   );
 
   if (!commandSummary.allSucceeded) {
@@ -126,9 +134,10 @@ async function openPullRequest(
   const runDate = getUtcDateString();
   const branchName = `${inputs.branchName}/${runDate}`;
   const git = createGitClient(repoRoot);
+  const changedDirectories = [...new Set(updateResult.manifestsUpdated.map((m) => m.directory))];
 
   await git.createBranch(branchName);
-  await git.commitAll(buildCommitMessage(updateResult.changes, inputs, runDate));
+  await git.commit(changedDirectories, buildCommitMessage(updateResult.changes, inputs, runDate));
   await git.push(branchName);
 
   const stalePullRequests = await findStalePullRequests(

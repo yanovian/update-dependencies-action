@@ -24,7 +24,7 @@ ecosystems and paths to skip.
 | `updated` | `true` if any dependency was updated. |
 | `pull-request-number` | Number of the pull request that was created or updated, if any. |
 | `pull-request-url` | URL of the pull request that was created or updated, if any. |
-| `changes-summary-path` | Path to a JSON file, written into the repo checkout, with every change and manual-action note from this run. |
+| `changes-summary-path` | Path to a JSON file with every change and manual-action note from this run. Written outside the repo checkout (the runner's temp directory), never committed. |
 | `commands-passed` | `true` if every command in `check-commands` exited successfully. |
 
 ## Config file

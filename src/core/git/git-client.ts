@@ -7,7 +7,7 @@ const BOT_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
 export interface GitClient {
   hasUncommittedChanges(): Promise<boolean>;
   createBranch(branchName: string): Promise<void>;
-  commitAll(message: string): Promise<void>;
+  commit(paths: readonly string[], message: string): Promise<void>;
   push(branchName: string): Promise<void>;
 }
 
@@ -26,10 +26,15 @@ export function createGitClient(repoRoot: string): GitClient {
     async createBranch(branchName: string): Promise<void> {
       await git(`checkout -B ${branchName}`);
     },
-    async commitAll(message: string): Promise<void> {
+    /** Only adds the given paths, never the whole tree: a plugin only ever touches the
+     * directories it was asked to update, so nothing outside that list, an unrelated dirty file
+     * already sitting in the checkout, a stray build artifact, this Action's own summary file,
+     * can ever end up in the commit. */
+    async commit(paths: readonly string[], message: string): Promise<void> {
       await git(`config user.name "${BOT_NAME}"`);
       await git(`config user.email "${BOT_EMAIL}"`);
-      await git('add -A');
+      const quotedPaths = paths.map((path) => `"${path}"`).join(' ');
+      await git(`add -- ${quotedPaths}`);
       const messagePath = await writeTempFile(
         'update-dependencies-commit-',
         'message.txt',
