@@ -1,0 +1,21 @@
+name: Pull request checks
+
+# The other half of the recommended path in examples/non-breaking/ and examples/breaking/.
+# Ordinary CI, triggered on every pull request, including the ones this Action opens. It only
+# runs automatically on those because the update workflows use a PAT for github-token instead of
+# the default GITHUB_TOKEN, see _docs/faq-and-limitations.md#creating-the-pat.
+#
+# If your repo already has a workflow like this, you don't need this file, just make sure
+# github-token in the update workflows is a PAT.
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint

@@ -1,0 +1,33 @@
+name: Update Dependencies (check-commands, simpler alternative)
+
+# Path 1 from _docs/faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use.
+# Simpler to set up than the recommended path (works with the default GITHUB_TOKEN, no PAT
+# needed), but not recommended: it duplicates whatever CI your repo already runs on pull
+# requests, and gates on that duplicate run instead of your real one. If a command below fails,
+# nothing is pushed and no pull request is created at all.
+#
+# See examples/non-breaking/ and examples/pull-request-checks/ for the recommended path.
+on:
+  schedule:
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: yanovian/update-dependencies-action@v1
+        with:
+          update-strategy: non-breaking
+          check-commands: |
+            npm ci
+            npm test
+            npm run lint
+          create-pull-request: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -27,29 +27,29 @@ Some things this Action finds are deliberately left alone rather than guessed at
 These are listed in the pull request body so you know to look at them yourself, instead of being
 silently skipped.
 
-## What happens if I don't give it any commands?
+## check-commands or your own CI, which should I use?
 
-`check-commands` is optional. With nothing in it, this Action updates dependencies and opens the
-pull request straight away, with nothing to gate on beforehand.
+Two ways to make sure an update is safe before it reaches you.
 
-That is a legitimate way to run it, not just a fallback. If your repo already runs CI on every
-pull request, you don't need to duplicate your whole test suite inside `check-commands`. Let this
-Action update dependencies and open the pull request, then let your existing pull request CI
-check it the same way it checks every other pull request. If something breaks, it breaks there,
-and you fix it in the pull request instead of paying for the same commands to run twice, once
-inside this Action and once again on the pull request itself.
+**Path 1: `check-commands`, default token.** Put your tests, lint, and build in
+`check-commands`. This Action runs them itself before opening anything. If one fails, nothing is
+pushed and no pull request is created, see [what happens if a command fails](#what-happens-if-a-command-fails)
+below. Works with the default `GITHUB_TOKEN`, nothing else to set up. Simpler, but not
+recommended: it duplicates whatever CI your repo already runs on pull requests.
 
-For your existing pull request CI to actually run on the pull request this Action opens, use a
-PAT, see the next question for why and how.
+**Path 2: your own CI, a PAT (recommended).** Leave `check-commands` empty. This Action only
+updates dependencies and opens the pull request. Your repo's own `pull_request` workflow checks
+it there, the same way it checks every other pull request. This is the normal shape of a pull
+request in any SDLC: open it, run CI on it, merge once it's green, nothing duplicated.
 
-## Why does the README recommend a PAT instead of the default token?
+This path needs a PAT instead of the default token, see below for why and how.
 
-GitHub deliberately stops the default `GITHUB_TOKEN` from triggering other workflows, including
-your repo's own `pull_request` checks, to prevent automation from looping into itself forever.
-That is fine if you use `check-commands` for everything, but it means the pull request this
-Action opens won't get your normal CI checks unless you give it a stronger token.
+## Creating the PAT
 
-The fix is a fine-grained personal access token (PAT):
+GitHub blocks the default `GITHUB_TOKEN` from triggering your other workflows, to stop
+automation from looping into itself. That means a `pull_request` workflow won't run on the pull
+request this Action opens unless you use a stronger token. A fine-grained personal access token
+(PAT) doesn't have that restriction:
 
 1. Go to **Settings → Developer settings → Personal access tokens → Fine-grained tokens** on
    GitHub and generate a new token.
@@ -58,19 +58,22 @@ The fix is a fine-grained personal access token (PAT):
    **Pull requests: Read and write**. Nothing else is needed.
 4. Copy the token, then add it as a repo secret: **Settings → Secrets and variables → Actions →
    New repository secret**. Name it `PAT_TOKEN`.
-5. Reference it in your workflow instead of the default token:
+5. Reference it in your workflow:
 
 ```yaml
 github-token: ${{ secrets.PAT_TOKEN }}
 ```
 
-The example workflows in the README and under `examples/workflows/` already use `PAT_TOKEN`.
+See [`examples/non-breaking/`](../examples/non-breaking/) and
+[`examples/with-check-commands/`](../examples/with-check-commands/) for both paths written out
+in full.
 
 ## What happens if a command fails?
 
-The whole run fails, and no pull request is created or updated. The updated files are left in the
-runner's working tree but never pushed anywhere, so nothing in your repo changes. Check the
-Action's log, each command runs in its own log group so the failing one is easy to spot.
+Only relevant for Path 1 above. The whole run fails, and no pull request is created or updated.
+The updated files are left in the runner's working tree but never pushed anywhere, so nothing in
+your repo changes. Check the Action's log, each command runs in its own log group so the failing
+one is easy to spot.
 
 ## Does it create a new pull request every time it runs?
 

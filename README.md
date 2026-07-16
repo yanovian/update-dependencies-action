@@ -21,19 +21,10 @@
 
 ## Usage
 
-The recommended setup is two workflows: frequent non-breaking updates, and breaking updates on a
-slower cadence so you have time to review them deliberately. `update-strategy: non-breaking` (the
-default) keeps every package within its current major version, the same as running `npm update`
-yourself. `update-strategy: breaking` allows major version jumps too, using each package
-manager's real update tooling wherever one exists.
-
-### Weekly non-breaking updates
-
-Save this as `.github/workflows/update-dependencies-non-breaking.yml`. Runs every Monday at
-02:00 UTC:
+Save this as `.github/workflows/update-dependencies.yml`. Runs every Monday at 02:00 UTC:
 
 ```yaml
-name: Update Dependencies (non-breaking)
+name: Update Dependencies
 
 on:
   schedule:
@@ -53,63 +44,25 @@ jobs:
       - uses: yanovian/update-dependencies-action@v1
         with:
           update-strategy: non-breaking
-          check-commands: |
-            npm ci
-            npm test
-            npm run lint
           create-pull-request: true
-          branch-name: update-dependencies/non-breaking
           github-token: ${{ secrets.PAT_TOKEN }}
 ```
 
-Full copy: [`examples/workflows/update-dependencies-non-breaking.yml`](examples/workflows/update-dependencies-non-breaking.yml)
+This is the recommended setup: no `check-commands`, a PAT for `github-token` (see
+[permissions and tokens](#permissions-and-tokens)), your repo's own pull request CI checks the
+update once it's opened, same as any other pull request.
 
-### Monthly breaking updates
+More examples, each in its own folder under [`examples/`](examples/):
 
-Save this as `.github/workflows/update-dependencies-breaking.yml`. Runs at 03:00 UTC on the 1st
-of every month. Cron can't reliably express "the first Monday of the month" in one line (a
-day-of-month restriction and a day-of-week restriction get OR'd together, not AND'd, so it fires
-more often than intended), so this uses a fixed calendar day instead:
+- [`examples/breaking/`](examples/breaking/): the monthly breaking-updates workflow
+- [`examples/with-check-commands/`](examples/with-check-commands/): the simpler `check-commands`
+  + default-token alternative
+- [`examples/pull-request-checks/`](examples/pull-request-checks/): the pull request CI workflow
+  the recommended setup expects you to already have
+- [`examples/with-config/`](examples/with-config/): skipping an ecosystem or a path with a config
+  file
 
-```yaml
-name: Update Dependencies (breaking)
-
-on:
-  schedule:
-    - cron: '0 3 1 * *' # the 1st of every month at 03:00 UTC
-  workflow_dispatch:
-
-permissions:
-  contents: write
-  pull-requests: write
-
-jobs:
-  update:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: yanovian/update-dependencies-action@v1
-        with:
-          update-strategy: breaking
-          check-commands: |
-            npm ci
-            npm test
-            npm run lint
-          create-pull-request: true
-          branch-name: update-dependencies/breaking
-          github-token: ${{ secrets.PAT_TOKEN }}
-```
-
-Full copy: [`examples/workflows/update-dependencies-breaking.yml`](examples/workflows/update-dependencies-breaking.yml)
-
-### More
-
-- Every input: [`_docs/configuration.md`](_docs/configuration.md)
-- Skip an ecosystem or a path: copy [`examples/update-dependencies.config.yml`](examples/update-dependencies.config.yml)
-  into `.github/update-dependencies.yml` and edit it.
-
-Don't trigger either workflow on `pull_request`. See
+Don't trigger this Action itself on `pull_request`. See
 [why in the FAQ](_docs/faq-and-limitations.md#can-i-trigger-this-on-pull_request).
 
 ## Supported package managers
@@ -151,22 +104,12 @@ permissions:
   pull-requests: write
 ```
 
-For `github-token`, use a fine-grained personal access token (PAT), not the default
-`GITHUB_TOKEN`. GitHub deliberately blocks the default token from triggering your repo's other
-workflows, to stop automation from looping into itself forever, which means your normal
-`pull_request` CI would never run on the pull request this Action opens. A PAT doesn't have that
-restriction.
+For `github-token`, there are two paths, explained in full in the
+[FAQ](_docs/faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use):
 
-Create one under **Settings → Developer settings → Personal access tokens → Fine-grained tokens**,
-scoped to just this repo, with **Contents: Read and write** and **Pull requests: Read and write**
-permissions. Add it as a repo secret named `PAT_TOKEN`, then reference it like the example
-workflows above do:
-
-```yaml
-github-token: ${{ secrets.PAT_TOKEN }}
-```
-
-Full steps: [FAQ](_docs/faq-and-limitations.md#why-does-the-readme-recommend-a-pat-instead-of-the-default-token).
+- **Recommended**: a PAT, so your repo's own pull request CI runs on the update automatically.
+  [How to create one](_docs/faq-and-limitations.md#creating-the-pat).
+- **Simpler, not recommended**: the default `GITHUB_TOKEN`, paired with `check-commands`.
 
 ## Docs
 

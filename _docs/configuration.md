@@ -9,13 +9,13 @@ ecosystems and paths to skip.
 | Input | Default | What it does |
 | --- | --- | --- |
 | `update-strategy` | `non-breaking` | `non-breaking` keeps every package within its current major version. `breaking` allows major version jumps too. |
-| `check-commands` | (empty) | Commands to run after updating, one per line, in order. Every command must exit 0 or no pull request is created. Leave empty to skip straight to the pull request and rely on your repo's own pull request CI instead, see the [FAQ](faq-and-limitations.md#what-happens-if-i-dont-give-it-any-commands). |
+| `check-commands` | (empty) | Commands to run after updating, one per line, in order. Every command must exit 0 or no pull request is created. Leave empty to rely on your repo's own pull request CI instead, see [check-commands or your own CI](faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use) in the FAQ. |
 | `create-pull-request` | `true` | Whether to open a pull request when there are updates and every command passed. Set to `false` to leave the updated files in the working tree instead, for example if you want to commit them yourself in a later step. |
 | `base-branch` | repo default branch | Branch the pull request is opened against. |
 | `branch-name` | `update-dependencies/<update-strategy>` | Branch this Action commits to. Re-running the workflow force-pushes the same branch and reuses the existing pull request instead of opening a new one. |
 | `config-path` | `.github/update-dependencies.yml` | Path to the config file described below. Missing is fine, everything is scanned by default. |
 | `working-directory` | `.` | Directory to scan, relative to the repo root. Use this if the Action should only look at part of a larger repo. |
-| `github-token` | `${{ github.token }}` | Token used to push the branch and open the pull request. Use a PAT here, not the default, see [permissions and tokens](../README.md#permissions-and-tokens) in the README for why and how. |
+| `github-token` | `${{ github.token }}` | Token used to push the branch and open the pull request. A PAT is recommended over the default, see [check-commands or your own CI](faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use) in the FAQ for why. |
 
 ## Outputs
 
@@ -29,7 +29,10 @@ ecosystems and paths to skip.
 
 ## Config file
 
-Save this as `.github/update-dependencies.yml` (or point `config-path` somewhere else):
+Save this as `.github/update-dependencies.yml`, directly under `.github/`, not inside
+`.github/workflows/` where your workflow file lives. `config-path` is resolved from the repo
+root, so it's a path like `.github/update-dependencies.yml`, not a path relative to the workflow
+file. Point `config-path` somewhere else if you'd rather not use the default location:
 
 ```yaml
 version: 1
@@ -51,3 +54,5 @@ ignorePaths:
 
 Per-package ignoring is not supported yet. See
 [FAQ and limitations](faq-and-limitations.md) for why.
+
+Full workflow paired with a config file: [`examples/with-config/`](../examples/with-config/).

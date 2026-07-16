@@ -1,0 +1,32 @@
+name: Update Dependencies
+
+# Same recommended setup as examples/non-breaking/ (no check-commands, a PAT for github-token),
+# paired here with update-dependencies-config.yml in this same folder to show config-path in
+# use.
+#
+# config-path is resolved from the repo root, not from wherever this workflow file lives. Save
+# this workflow as .github/workflows/update-dependencies.yml as usual, but save the config file
+# straight under .github/, not inside .github/workflows/:
+#   .github/update-dependencies-config.yml   <- correct, matches config-path below
+#   .github/workflows/update-dependencies-config.yml   <- wrong, this Action won't find it there
+on:
+  schedule:
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: yanovian/update-dependencies-action@v1
+        with:
+          update-strategy: non-breaking
+          config-path: .github/update-dependencies-config.yml
+          create-pull-request: true
+          github-token: ${{ secrets.PAT_TOKEN }}

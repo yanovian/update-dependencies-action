@@ -3,13 +3,14 @@ name: Update Dependencies (breaking)
 # Runs at 03:00 UTC on the 1st of every month. Cron can't reliably express "the first Monday of
 # the month" in one line (a day-of-month restriction and a day-of-week restriction get OR'd
 # together, not AND'd, so it fires more often than intended), so this uses a fixed calendar day
-# instead, simple and predictable. Pair this with update-dependencies-non-breaking.yml for
-# weekly non-breaking updates the rest of the time.
+# instead, simple and predictable.
 #
-# Uses a PAT (see PAT_TOKEN below) instead of the default GITHUB_TOKEN. GitHub blocks the
-# default token from triggering your other workflows, to stop automation from looping into
-# itself, which means your repo's own pull_request CI would never run on the pull request this
-# opens. See _docs/faq-and-limitations.md for how to create the PAT.
+# Recommended path: no check-commands, a PAT for github-token, examples/pull-request-checks/
+# checks the update once it's opened. See
+# _docs/faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use for the two
+# paths, and examples/with-check-commands/ for the simpler alternative.
+#
+# Pair this with examples/non-breaking/ for weekly non-breaking updates the rest of the time.
 on:
   schedule:
     - cron: '0 3 1 * *'
@@ -28,10 +29,6 @@ jobs:
       - uses: yanovian/update-dependencies-action@v1
         with:
           update-strategy: breaking
-          check-commands: |
-            npm ci
-            npm test
-            npm run lint
           create-pull-request: true
           branch-name: update-dependencies/breaking
           github-token: ${{ secrets.PAT_TOKEN }}

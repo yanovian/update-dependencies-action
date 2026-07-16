@@ -1,0 +1,32 @@
+name: Update Dependencies (non-breaking)
+
+# Runs every Monday at 02:00 UTC and keeps every package within its current major version.
+# Recommended path: no check-commands, a PAT for github-token, examples/pull-request-checks/
+# checks the update once it's opened. See
+# _docs/faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use for the two
+# paths, and examples/with-check-commands/ for the simpler alternative.
+#
+# Pair this with examples/breaking/ for major version jumps on a slower monthly cadence, so
+# day-to-day updates stay small and frequent while breaking changes get reviewed deliberately,
+# once a month.
+on:
+  schedule:
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: yanovian/update-dependencies-action@v1
+        with:
+          update-strategy: non-breaking
+          create-pull-request: true
+          branch-name: update-dependencies/non-breaking
+          github-token: ${{ secrets.PAT_TOKEN }}
