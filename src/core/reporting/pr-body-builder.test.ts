@@ -48,6 +48,18 @@ describe('buildPullRequestBody', () => {
     expect(body).toContain('responsibility of the dev, QA, and test teams');
   });
 
+  it('labels a range-only change as indirect', () => {
+    const body = buildPullRequestBody({
+      mode: 'non-breaking',
+      changes: [{ ...CHANGE, breaking: false, indirect: true }],
+      manualActionNeeded: [],
+      commandResults: [],
+      runDate: '2026-07-16',
+      stalePullRequests: [],
+    });
+    expect(body).toContain('| npm | app | left-pad | 1.0.0 | 2.0.0 | Non-breaking (indirect) |');
+  });
+
   it('includes a manual-action-needed section when there is one', () => {
     const body = buildPullRequestBody({
       mode: 'breaking',

@@ -115,11 +115,36 @@ describe('runJsUpdate', () => {
     ]);
   });
 
-  it('warns with the unresolved names and a lockfile snippet when resolution comes back short', async () => {
+  it('always logs the full before/after comparison, not just when something looks wrong', async () => {
+    mockPackageJson();
+    const resolveVersions = vi.fn().mockReturnValue(
+      new Map([
+        ['left-pad', '1.0.0'],
+        ['lodash', '4.0.0'],
+      ]),
+    );
+
+    await runJsUpdate({
+      ecosystem: 'npm',
+      location,
+      ctx: { repoRoot: '/repo', logger },
+      lockfileName: 'package-lock.json',
+      command: 'npm update',
+      resolveVersions,
+    });
+
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringContaining('Resolved versions compared in app:'),
+    );
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('left-pad: 1.0.0 -> 1.0.0'));
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('lodash: 4.0.0 -> 4.0.0'));
+  });
+
+  it('warns with the unresolved names and a lockfile snippet, and flags a manual note, when resolution comes back short', async () => {
     mockPackageJson();
     const resolveVersions = vi.fn().mockReturnValue(new Map());
 
-    await runJsUpdate({
+    const result = await runJsUpdate({
       ecosystem: 'npm',
       location,
       ctx: { repoRoot: '/repo', logger },
@@ -135,5 +160,71 @@ describe('runJsUpdate', () => {
     expect(logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('arbitrary lockfile contents'),
     );
+    expect(result.changes).toEqual([]);
+    expect(result.manualActionNeeded).toEqual([
+      expect.objectContaining({
+        ecosystem: 'npm',
+        path: 'app',
+        name: null,
+        reason: expect.stringContaining("doesn't list every dependency"),
+      }),
+    ]);
+  });
+
+  it('does not flag a manual note when resolution was complete and the diff is genuinely empty', async () => {
+    mockPackageJson();
+    const resolveVersions = vi.fn().mockReturnValue(
+      new Map([
+        ['left-pad', '1.0.0'],
+        ['lodash', '4.0.0'],
+      ]),
+    );
+
+    const result = await runJsUpdate({
+      ecosystem: 'npm',
+      location,
+      ctx: { repoRoot: '/repo', logger },
+      lockfileName: 'package-lock.json',
+      command: 'npm update',
+      resolveVersions,
+    });
+
+    expect(result.changes).toEqual([]);
+    expect(result.manualActionNeeded).toEqual([]);
+    expect(result.diskChangeExplained).toBe(true);
+  });
+
+  it('reports a range-only change as indirect when the resolved version did not move', async () => {
+    let packageJsonReadCount = 0;
+    readFileMock.mockImplementation(async (filePath: string) => {
+      if (!filePath.endsWith('package.json')) {
+        return 'arbitrary lockfile contents';
+      }
+      packageJsonReadCount += 1;
+      const range = packageJsonReadCount === 1 ? '^19.2.0' : '^19.2.7';
+      return JSON.stringify({ dependencies: { react: range } });
+    });
+    const resolveVersions = vi.fn().mockReturnValue(new Map([['react', '19.2.7']]));
+
+    const result = await runJsUpdate({
+      ecosystem: 'npm',
+      location,
+      ctx: { repoRoot: '/repo', logger },
+      lockfileName: 'package-lock.json',
+      command: 'npm update',
+      resolveVersions,
+    });
+
+    expect(result.changes).toEqual([
+      {
+        ecosystem: 'npm',
+        path: 'app',
+        name: 'react',
+        fromVersion: '^19.2.0',
+        toVersion: '^19.2.7',
+        breaking: false,
+        indirect: true,
+      },
+    ]);
   });
 });

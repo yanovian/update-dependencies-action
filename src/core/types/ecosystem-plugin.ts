@@ -33,6 +33,10 @@ export interface PackageChange {
   readonly fromVersion: string;
   readonly toVersion: string;
   readonly breaking: boolean;
+  /** True when only the declared version range changed (e.g. package.json's specifier), with
+   * the resolved, actually-installed version unaffected. Absent/false means a real, direct
+   * version change. */
+  readonly indirect?: boolean;
 }
 
 /**
@@ -52,6 +56,15 @@ export interface ManualNote {
 export interface PluginUpdateResult {
   readonly changes: PackageChange[];
   readonly manualActionNeeded: ManualNote[];
+  /**
+   * True when the plugin itself already confidently determined nothing meaningful changed, even
+   * if the manifest or lockfile's bytes did (reformatting, metadata churn). Without this,
+   * "0 changes, 0 notes" looks identical whether a plugin confidently checked and found nothing,
+   * or has no idea, so the orchestrator's own disk-diff safety net (see update-repo.ts) would
+   * re-flag a case a plugin already resolved, defeating the point of it doing that work itself.
+   * Most plugins never set this and get the safety net as before.
+   */
+  readonly diskChangeExplained?: boolean;
 }
 
 export interface UpdateContext {

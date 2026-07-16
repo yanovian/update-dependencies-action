@@ -50,7 +50,8 @@ export async function updateRepo(
     changes.push(...result.changes);
     manualActionNeeded.push(...result.manualActionNeeded);
 
-    if (result.changes.length === 0 && result.manualActionNeeded.length === 0) {
+    const emptyResult = result.changes.length === 0 && result.manualActionNeeded.length === 0;
+    if (emptyResult && !result.diskChangeExplained) {
       const note = await checkForUnexplainedChanges(repoRoot, manifest, logger);
       if (note) {
         manualActionNeeded.push(note);

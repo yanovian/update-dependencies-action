@@ -119,4 +119,25 @@ describe('updateRepo', () => {
       expect.stringContaining('app/package-lock.json, app/package.json'),
     );
   });
+
+  it('trusts a plugin that already confidently explains an empty diff, and skips its own disk check', async () => {
+    const plugin: DependencyUpdatePlugin = {
+      id: 'npm',
+      language: 'JavaScript/TypeScript',
+      detectManifests: () => [MANIFEST],
+      update: async () => ({ changes: [], manualActionNeeded: [], diskChangeExplained: true }),
+    };
+
+    const result = await updateRepo(['app/package.json'], {
+      repoRoot: '/repo',
+      registry: registryWith(plugin),
+      mode: 'non-breaking',
+      config,
+      logger,
+    });
+
+    expect(runProcessMock).not.toHaveBeenCalled();
+    expect(result.changes).toEqual([]);
+    expect(result.manualActionNeeded).toEqual([]);
+  });
 });

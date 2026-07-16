@@ -7,6 +7,7 @@ import { readFileIfPresent } from '../../util/read-file-if-present.js';
 import type {
   EcosystemId,
   ManifestLocation,
+  ManualNote,
   PluginUpdateResult,
   UpdateContext,
 } from '../../types/ecosystem-plugin.js';
@@ -88,9 +89,81 @@ export async function runJsUpdate(options: JsUpdateOptions): Promise<PluginUpdat
   await runProcess(command, { cwd: dir });
 
   const after = await readVersionsIfPresent({ ...readOptions, label: 'After update' });
+  ctx.logger.info(formatVersionComparison(location.directory, before.versions, after.versions));
+  const changes = diffVersions(before.versions, after.versions, ecosystem, location.directory);
+
+  // If resolution was ever incomplete, a "0 changes" diff isn't trustworthy: it may just mean
+  // the lockfile doesn't match the manifest, not that nothing changed. Say so specifically here
+  // rather than let update-repo's generic "files changed but no changes reported" fallback give
+  // a vaguer answer.
+  if (changes.length === 0 && (!before.complete || !after.complete)) {
+    return {
+      changes,
+      manualActionNeeded: [
+        buildUnresolvedNote(
+          ecosystem,
+          location.directory,
+          path.basename(manifestAbsPath),
+          lockfileName,
+        ),
+      ],
+    };
+  }
+
+  // A package manager can rewrite package.json's own declared range (e.g. "^19.2.0" to
+  // "^19.2.7") without the resolved version moving, already satisfied the old range. That's a
+  // real, visible file change a reader would otherwise have no explanation for, so report it
+  // too, tagged indirect, for any name not already covered by a real resolved-version change
+  // above.
+  const alreadyReported = new Set(changes.map((change) => change.name));
+  const declaredAfter = await readDeclaredDependencies(manifestAbsPath);
+  const rangeChanges = diffVersions(declared, declaredAfter, ecosystem, location.directory)
+    .filter((change) => !alreadyReported.has(change.name))
+    .map((change) => ({ ...change, indirect: true }));
+
+  // Resolution was complete on both sides: whatever's in `changes` (even an empty list) is a
+  // real, confident answer, the manifest/lockfile bytes may still have changed on disk
+  // (reformatting, metadata churn) with no version actually moving, so tell the orchestrator not
+  // to second-guess this with its own generic disk-diff check, which has no way to know this
+  // plugin already looked.
   return {
-    changes: diffVersions(before, after, ecosystem, location.directory),
+    changes: [...changes, ...rangeChanges],
     manualActionNeeded: [],
+    diskChangeExplained: true,
+  };
+}
+
+/** Printed unconditionally, not just when something looks wrong, so "nothing changed" is always
+ * a visible, checkable claim (here's every package this Action compared, and what it saw on
+ * each side) instead of something you have to trust blind. */
+function formatVersionComparison(
+  directory: string,
+  before: ReadonlyMap<string, string>,
+  after: ReadonlyMap<string, string>,
+): string {
+  const names = [...new Set([...before.keys(), ...after.keys()])].sort();
+  const lines = names.map(
+    (name) =>
+      `  ${name}: ${before.get(name) ?? '(unresolved)'} -> ${after.get(name) ?? '(unresolved)'}`,
+  );
+  return [`Resolved versions compared in ${directory}:`, ...lines].join('\n');
+}
+
+function buildUnresolvedNote(
+  ecosystem: EcosystemId,
+  directory: string,
+  manifestFilename: string,
+  lockfileName: string,
+): ManualNote {
+  return {
+    ecosystem,
+    path: directory,
+    name: null,
+    reason:
+      `${lockfileName} doesn't list every dependency ${manifestFilename} declares, so version ` +
+      "changes here couldn't be confirmed. This usually means the lockfile is out of sync with " +
+      'the manifest (see the "Unresolved" warning in the Action log for exactly which ' +
+      'dependencies), regenerate the lockfile in this directory to fix it.',
   };
 }
 
@@ -102,17 +175,24 @@ interface ReadVersionsOptions {
   readonly label: string;
 }
 
+interface VersionSnapshot {
+  readonly versions: Map<string, string>;
+  /** False when the lockfile resolved fewer of the declared dependencies than expected, the
+   * signal that a resulting "0 changes" diff isn't a confident answer. */
+  readonly complete: boolean;
+}
+
 /**
  * Reads and parses the lockfile, and, if it resolved fewer of the declared dependencies than
  * expected, logs enough of the lockfile's own shape (not just "0 changes found") to diagnose a
  * lockfile format this Action's parser doesn't handle, rather than let that failure look
  * identical to "nothing needed updating".
  */
-async function readVersionsIfPresent(options: ReadVersionsOptions): Promise<Map<string, string>> {
+async function readVersionsIfPresent(options: ReadVersionsOptions): Promise<VersionSnapshot> {
   const { lockfileAbsPath, declared, resolveVersions, logger, label } = options;
   const contents = await readFileIfPresent(lockfileAbsPath);
   if (contents === null) {
-    return new Map();
+    return { versions: new Map(), complete: declared.size === 0 };
   }
 
   const resolved = resolveVersions(contents, declared);
@@ -124,5 +204,5 @@ async function readVersionsIfPresent(options: ReadVersionsOptions): Promise<Map<
         `Lockfile starts with: ${contents.slice(0, 400).replace(/\n/g, ' | ')}`,
     );
   }
-  return resolved;
+  return { versions: resolved, complete: resolved.size === declared.size };
 }

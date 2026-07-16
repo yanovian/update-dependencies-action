@@ -48,10 +48,10 @@ function buildChangesTable(changes: readonly PackageChange[]): string {
       a.path.localeCompare(b.path) ||
       a.name.localeCompare(b.name),
   );
-  const rows = sorted.map(
-    (change) =>
-      `| ${change.ecosystem} | ${change.path} | ${change.name} | ${change.fromVersion} | ${change.toVersion} | ${change.breaking ? 'Breaking' : 'Non-breaking'} |`,
-  );
+  const rows = sorted.map((change) => {
+    const type = change.breaking ? 'Breaking' : 'Non-breaking';
+    return `| ${change.ecosystem} | ${change.path} | ${change.name} | ${change.fromVersion} | ${change.toVersion} | ${change.indirect ? `${type} (indirect)` : type} |`;
+  });
 
   return [
     '## Dependency changes',
