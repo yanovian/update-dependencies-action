@@ -135,3 +135,7 @@ breaking update.
 This project uses [pnpm](https://pnpm.io) and Node 24. See [`Makefile`](Makefile) for the
 available dev commands (`make install`, `make test`, `make lint`, `make verify`, and so on). See
 [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to add support for another package manager.
+
+## Projects using it
+
+- [Tabby: Chrome extension](https://github.com/yanovian/chrome-ext-tabby)
