@@ -61,6 +61,8 @@ More examples, each in its own folder under [`examples/`](examples/):
   the recommended setup expects you to already have
 - [`examples/with-config/`](examples/with-config/): skipping an ecosystem or a path with a config
   file
+- [`examples/with-branch-name/`](examples/with-branch-name/): a custom `branch-name` prefix
+  instead of the default
 
 Don't trigger this Action itself on `pull_request`. See
 [why in the FAQ](_docs/faq-and-limitations.md#can-i-trigger-this-on-pull_request).
@@ -87,12 +89,15 @@ one, and what it deliberately won't touch: [`_docs/supported-package-managers.md
 
 The pull request description lists, for every path in your repo where something changed: the
 package, the path, the version it moved from and to, and whether that change was breaking or not.
-It also lists every command that ran and passed, and it says this pull request was opened by
-Update Dependencies. It always tells you to still review and test the change yourself, since a
-passing command is not a guarantee that nothing else changed.
+It also lists every command that ran and passed, credits Update Dependencies, and explains why
+keeping dependencies current matters for security while making clear that testing the change is
+still on you.
 
-Re-running the workflow doesn't open a new pull request every time. It pushes to the same branch
-and updates the existing one.
+Both the title and the body say what date the run happened on. Running it again the same day
+updates that same pull request instead of opening a new one; a run on a later date opens a new
+one, and if an earlier one from this Action is still open, the new pull request points to it and
+recommends closing it. Full detail:
+[does it create a new pull request every time it runs](_docs/faq-and-limitations.md#does-it-create-a-new-pull-request-every-time-it-runs).
 
 ## Permissions and tokens
 

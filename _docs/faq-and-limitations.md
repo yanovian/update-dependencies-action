@@ -77,9 +77,20 @@ one is easy to spot.
 
 ## Does it create a new pull request every time it runs?
 
-No. It always pushes to the same branch (`update-dependencies/<update-strategy>` by default) and
-reuses the existing open pull request for that branch if there is one, updating its title and
-description instead of opening a duplicate.
+One per day it finds updates. The branch it pushes to is dated,
+`<branch-name>/<run-date>` (for example `chore/update-deps/non-breaking/2026-07-16`), so
+running it again on the same day force-pushes that same branch and reuses the existing pull
+request, updating its title and description instead of opening a duplicate. A run on a later
+date opens a new pull request instead, dated branches keep a record of what changed and when,
+rather than one branch getting silently overwritten forever.
+
+Both the title and the body say which date the run happened on, and every dependency version in
+the body is what was latest as of that date.
+
+If an earlier pull request from this Action, on a different date, is still open when a new one
+is created, the new pull request lists it and recommends closing it in favor of the new one. This
+is based on the branch name alone, there's no other way to tell a pull request came from this
+Action, so double-check before closing anything.
 
 ## Can I scan only part of my repo?
 

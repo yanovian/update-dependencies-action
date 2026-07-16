@@ -22,7 +22,7 @@ export function readActionInputs(): ActionInputs {
     checkCommands: core.getInput('check-commands'),
     createPullRequest: core.getBooleanInput('create-pull-request'),
     baseBranch: core.getInput('base-branch'),
-    branchName: core.getInput('branch-name') || `update-dependencies/${updateStrategy}`,
+    branchName: core.getInput('branch-name') || `chore/update-deps/${updateStrategy}`,
     configPath: core.getInput('config-path') || '.github/update-dependencies.yml',
     workingDirectory: core.getInput('working-directory') || '.',
     githubToken: core.getInput('github-token', { required: true }),

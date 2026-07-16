@@ -5,7 +5,11 @@ import { loadConfig } from '../core/config/config-loader.js';
 import { listRepoFiles } from '../core/discovery/list-repo-files.js';
 import { createGitClient } from '../core/git/git-client.js';
 import { resolveBaseBranch } from '../core/github/base-branch.js';
-import { createOrUpdatePullRequest, type PullRequestResult } from '../core/github/pr-manager.js';
+import {
+  createOrUpdatePullRequest,
+  findStalePullRequests,
+  type PullRequestResult,
+} from '../core/github/pr-manager.js';
 import type { Logger } from '../core/logging/logger.js';
 import { createAllPlugins } from '../core/plugins/all-plugins.js';
 import { createPluginRegistry, type PluginRegistry } from '../core/plugins/registry.js';
@@ -13,6 +17,7 @@ import { buildPullRequestBody, buildPullRequestTitle } from '../core/reporting/p
 import { writeSummaryToDisk } from '../core/reporting/report-builder.js';
 import type { PackageChange } from '../core/types/ecosystem-plugin.js';
 import { updateRepo, type UpdateRepoResult } from '../core/update/update-repo.js';
+import { getUtcDateString } from '../core/util/current-date.js';
 import type { ActionInputs } from './inputs.js';
 import { readActionInputs } from './inputs.js';
 import { setActionOutputs } from './outputs.js';
@@ -107,6 +112,10 @@ async function verifyAndPublish(
   });
 }
 
+/** The branch pushed to is dated (branchPrefix/YYYY-MM-DD), so running this again the same day
+ * force-pushes and reuses the same pull request, same as before, but a run on a later date opens
+ * a new one instead of silently rewriting yesterday's, which would otherwise make the pull
+ * request history useless as a record of what happened when. */
 async function openPullRequest(
   inputs: ActionInputs,
   updateResult: UpdateRepoResult,
@@ -114,26 +123,40 @@ async function openPullRequest(
   repoRoot: string,
 ): Promise<PullRequestResult> {
   const baseBranch = await resolveBaseBranch(inputs.githubToken, inputs.baseBranch);
+  const runDate = getUtcDateString();
+  const branchName = `${inputs.branchName}/${runDate}`;
   const git = createGitClient(repoRoot);
 
-  await git.createBranch(inputs.branchName);
-  await git.commitAll(buildCommitMessage(updateResult.changes, inputs));
-  await git.push(inputs.branchName);
+  await git.createBranch(branchName);
+  await git.commitAll(buildCommitMessage(updateResult.changes, inputs, runDate));
+  await git.push(branchName);
+
+  const stalePullRequests = await findStalePullRequests(
+    inputs.githubToken,
+    inputs.branchName,
+    branchName,
+  );
 
   return createOrUpdatePullRequest({
     githubToken: inputs.githubToken,
     baseBranch,
-    branchName: inputs.branchName,
-    title: buildPullRequestTitle(updateResult.changes, inputs.updateStrategy),
+    branchName,
+    title: buildPullRequestTitle(updateResult.changes, inputs.updateStrategy, runDate),
     body: buildPullRequestBody({
       mode: inputs.updateStrategy,
       changes: updateResult.changes,
       manualActionNeeded: updateResult.manualActionNeeded,
       commandResults,
+      runDate,
+      stalePullRequests,
     }),
   });
 }
 
-function buildCommitMessage(changes: readonly PackageChange[], inputs: ActionInputs): string {
-  return buildPullRequestTitle(changes, inputs.updateStrategy);
+function buildCommitMessage(
+  changes: readonly PackageChange[],
+  inputs: ActionInputs,
+  runDate: string,
+): string {
+  return buildPullRequestTitle(changes, inputs.updateStrategy, runDate);
 }

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   commitAll: vi.fn(),
   push: vi.fn(),
   createOrUpdatePullRequest: vi.fn(),
+  findStalePullRequests: vi.fn(),
   resolveBaseBranch: vi.fn(),
 }));
 
@@ -42,9 +43,11 @@ vi.mock('../core/git/git-client.js', () => ({
 }));
 vi.mock('../core/github/pr-manager.js', () => ({
   createOrUpdatePullRequest: mocks.createOrUpdatePullRequest,
+  findStalePullRequests: mocks.findStalePullRequests,
 }));
 vi.mock('../core/github/base-branch.js', () => ({ resolveBaseBranch: mocks.resolveBaseBranch }));
 vi.mock('../core/plugins/all-plugins.js', () => ({ createAllPlugins: () => [] }));
+vi.mock('../core/util/current-date.js', () => ({ getUtcDateString: () => '2026-07-16' }));
 
 vi.mock('./inputs.js', () => ({
   readActionInputs: () => ({
@@ -52,7 +55,7 @@ vi.mock('./inputs.js', () => ({
     checkCommands: 'npm test',
     createPullRequest: true,
     baseBranch: '',
-    branchName: 'update-dependencies/non-breaking',
+    branchName: 'chore/update-deps/non-breaking',
     configPath: '.github/update-dependencies.yml',
     workingDirectory: '.',
     githubToken: 'token',
@@ -78,6 +81,7 @@ beforeEach(() => {
   mocks.writeSummaryToDisk.mockResolvedValue('/repo/update-dependencies-summary.json');
   mocks.parseCommands.mockReturnValue(['npm test']);
   mocks.resolveBaseBranch.mockResolvedValue('main');
+  mocks.findStalePullRequests.mockResolvedValue([]);
   mocks.createOrUpdatePullRequest.mockResolvedValue({
     number: 42,
     url: 'https://github.com/example/repo/pull/42',
@@ -136,9 +140,14 @@ describe('run', () => {
 
     await run(logger);
 
-    expect(mocks.createBranch).toHaveBeenCalledWith('update-dependencies/non-breaking');
+    expect(mocks.createBranch).toHaveBeenCalledWith('chore/update-deps/non-breaking/2026-07-16');
     expect(mocks.commitAll).toHaveBeenCalled();
-    expect(mocks.push).toHaveBeenCalledWith('update-dependencies/non-breaking');
+    expect(mocks.push).toHaveBeenCalledWith('chore/update-deps/non-breaking/2026-07-16');
+    expect(mocks.findStalePullRequests).toHaveBeenCalledWith(
+      'token',
+      'chore/update-deps/non-breaking',
+      'chore/update-deps/non-breaking/2026-07-16',
+    );
     expect(mocks.createOrUpdatePullRequest).toHaveBeenCalled();
     expect(mocks.setActionOutputs).toHaveBeenCalledWith(
       expect.objectContaining({ updated: true, commandsPassed: true, pullRequestNumber: 42 }),

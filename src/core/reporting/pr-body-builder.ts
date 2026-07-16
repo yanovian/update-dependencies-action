@@ -1,4 +1,5 @@
 import type { CommandResult } from '../commands/command-runner.js';
+import type { StalePullRequest } from '../github/pr-manager.js';
 import type { ManualNote, PackageChange, UpdateMode } from '../types/ecosystem-plugin.js';
 
 const ACTION_URL = 'https://github.com/yanovian/update-dependencies-action';
@@ -8,23 +9,36 @@ export interface PrBodyOptions {
   readonly changes: readonly PackageChange[];
   readonly manualActionNeeded: readonly ManualNote[];
   readonly commandResults: readonly CommandResult[];
+  readonly runDate: string;
+  readonly stalePullRequests: readonly StalePullRequest[];
 }
 
-export function buildPullRequestTitle(changes: readonly PackageChange[], mode: UpdateMode): string {
+export function buildPullRequestTitle(
+  changes: readonly PackageChange[],
+  mode: UpdateMode,
+  runDate: string,
+): string {
   const paths = new Set(changes.map((change) => change.path));
   const kind = mode === 'breaking' ? 'breaking' : 'non-breaking';
-  return `chore(deps): ${kind} update of ${changes.length} package(s) across ${paths.size} path(s)`;
+  return `chore(deps): ${kind} update of ${changes.length} package(s) across ${paths.size} path(s) (${runDate})`;
 }
 
 export function buildPullRequestBody(options: PrBodyOptions): string {
   const sections = [
+    buildRunDateNote(options.runDate),
     buildChangesTable(options.changes),
     buildManualNotesSection(options.manualActionNeeded),
     buildCommandsSection(options.commandResults),
+    buildStalePullRequestsSection(options.stalePullRequests),
+    buildSecuritySection(),
     buildFooter(),
   ].filter((section) => section.length > 0);
 
   return sections.join('\n\n');
+}
+
+function buildRunDateNote(runDate: string): string {
+  return `**Run date:** ${runDate} (UTC). The versions below are what was latest as of this date.`;
 }
 
 function buildChangesTable(changes: readonly PackageChange[]): string {
@@ -72,11 +86,43 @@ function buildCommandsSection(commandResults: readonly CommandResult[]): string 
   ].join('\n');
 }
 
-function buildFooter(): string {
+function buildStalePullRequestsSection(stalePullRequests: readonly StalePullRequest[]): string {
+  if (stalePullRequests.length === 0) {
+    return '';
+  }
+  const items = stalePullRequests.map(
+    (pullRequest) => `- #${pullRequest.number} (branch \`${pullRequest.branchName}\`)`,
+  );
   return [
-    `This pull request was opened automatically by [Update Dependencies](${ACTION_URL}).`,
+    '## Other open pull requests from this Action',
     '',
-    'Please review and test this change yourself before merging. Passing commands is not a ' +
-      'substitute for a human check, especially for a breaking update.',
+    `${stalePullRequests.length} other open pull request(s) look like they were opened by this ` +
+      'Action on an earlier run, based on their branch name:',
+    '',
+    ...items,
+    '',
+    'We recommend closing those and working from this one instead, it has the latest versions. ' +
+      'Double-check each one first, in case the branch name is a coincidence or someone has ' +
+      'since added their own changes to it.',
   ].join('\n');
+}
+
+function buildSecuritySection(): string {
+  return [
+    '## Why keep dependencies updated',
+    '',
+    'An outdated dependency is a common way vulnerabilities reach production: an old version can ' +
+      'carry a known, publicly documented flaw that a newer release already fixed. Keeping ' +
+      'dependencies current is one of the simplest ways to reduce that exposure.',
+    '',
+    'That said, passing automated checks is not the same as being safe to merge. It is the ' +
+      'responsibility of the dev, QA, and test teams to confirm this update does not change your ' +
+      'application logic in ways your tests do not catch, whether through solid automated ' +
+      'coverage or a manual pass. We recommend manually testing regardless, across the different ' +
+      'areas of your app that matter, even when everything above already passed.',
+  ].join('\n');
+}
+
+function buildFooter(): string {
+  return `This pull request was opened automatically by [Update Dependencies](${ACTION_URL}).`;
 }

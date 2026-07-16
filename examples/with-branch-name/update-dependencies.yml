@@ -1,0 +1,30 @@
+name: Update Dependencies
+
+# Same recommended setup as examples/non-breaking/ (no check-commands, a PAT for github-token),
+# with a custom branch-name to show that input in use.
+#
+# branch-name is a prefix, not the literal branch: the actual branch this Action pushes to is
+# <branch-name>/<run-date>, so the value below produces branches like
+# bot/dependency-updates/2026-07-16, one per day it finds updates. Leave branch-name unset to
+# get the default prefix instead, chore/update-deps/<update-strategy>.
+on:
+  schedule:
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: yanovian/update-dependencies-action@v1
+        with:
+          update-strategy: non-breaking
+          branch-name: bot/dependency-updates
+          create-pull-request: true
+          github-token: ${{ secrets.PAT_TOKEN }}

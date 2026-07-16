@@ -23,7 +23,7 @@ inputs:
     required: false
     default: ''
   branch-name:
-    description: 'Branch to commit updates to. Defaults to update-dependencies/<update-strategy>.'
+    description: 'Prefix for the branch this Action commits to, the actual branch is <branch-name>/<run-date>. Defaults to chore/update-deps/<update-strategy>.'
     required: false
     default: ''
   config-path:
