@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/yanovian/update-dependencies-action)](https://github.com/yanovian/update-dependencies-action/releases/latest)
 [![License: MIT](https://img.shields.io/github/license/yanovian/update-dependencies-action)](LICENSE)
 
-**Updates your dependencies, runs your tests, and only opens a pull request if everything still passes.**
+**Updates your dependencies and opens a pull request, gated on your checks passing when you give it any to run.**
 
 > 🛒 [Check out on the Marketplace](https://github.com/marketplace/actions/update-dependencies)
 >
@@ -12,10 +12,11 @@
 
 - **Scans every package manager in your repo, in one run.** npm, Yarn, pnpm, pip, Cargo, Go,
   Maven, Gradle, Bundler, Composer, and NuGet, across every path in a monorepo, not just the root.
-- **Runs your own checks first.** Your unit tests, integration tests, linter, build, whatever you
-  already have, one at a time, clearly labeled in the Actions log.
-- **Opens a pull request only if every check passes.** If anything fails, nothing gets pushed and
-  nothing gets opened.
+- **Opens a pull request either way, gated on checks when you give it any.** Put your tests,
+  lint, and build in `check-commands` to stop a failing update before a pull request ever opens,
+  or leave it empty and let your repo's own pull request CI check it there instead. See
+  [check-commands or your own CI](_docs/faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use)
+  for which one we recommend.
 - **Non-breaking by default, breaking on your own schedule.** Every change in the pull request is
   labeled breaking or non-breaking based on the actual version jump, not just the mode you ran.
 
@@ -125,9 +126,9 @@ For `github-token`, there are two paths, explained in full in the
 
 ## A note on trust
 
-This Action runs whatever commands you give it and only opens a pull request if they all pass.
-That's a real signal, but it's not a guarantee. Review the diff yourself before merging,
-especially for a breaking update.
+If you give this Action commands to run, a pull request only opens once they all pass, that's a
+real signal, but it's not a guarantee. Review the diff yourself before merging, especially for a
+breaking update.
 
 ## Contributing
 

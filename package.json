@@ -1,7 +1,7 @@
 {
   "name": "update-dependencies",
   "version": "1.0.3",
-  "description": "GitHub Action that scans every package manager in a repo, updates dependencies, runs your verification commands, and opens a PR only if they all pass",
+  "description": "GitHub Action that scans every package manager in a repo, updates dependencies, and opens a PR, gated on checks if you give it any",
   "private": true,
   "license": "MIT",
   "type": "module",
