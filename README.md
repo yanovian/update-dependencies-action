@@ -1,15 +1,6 @@
 # 📦 Update Dependencies
 
-<!-- A table, not three plain badge links, on purpose: the GitHub Marketplace listing page
-applies its own site-wide `img { display: block }` rule that stacks badges on separate lines no
-matter how they're written in markdown. Table cells lay out horizontally regardless of that, so
-this is the one structure that renders as a single row on both the repo page and the Marketplace
-listing. -->
-<table><tr>
-<td><a href="https://github.com/yanovian/update-dependencies-action/actions/workflows/ci.yml"><img src="https://github.com/yanovian/update-dependencies-action/actions/workflows/ci.yml/badge.svg" alt="CI"></a></td>
-<td><a href="https://github.com/yanovian/update-dependencies-action/releases/latest"><img src="https://img.shields.io/github/v/release/yanovian/update-dependencies-action" alt="Latest release"></a></td>
-<td><a href="https://github.com/yanovian/update-dependencies-action/blob/master/LICENSE"><img src="https://img.shields.io/github/license/yanovian/update-dependencies-action" alt="License: MIT"></a></td>
-</tr></table>
+[![CI](https://github.com/yanovian/update-dependencies-action/actions/workflows/ci.yml/badge.svg)](https://github.com/yanovian/update-dependencies-action/actions/workflows/ci.yml) [![Latest release](https://img.shields.io/github/v/release/yanovian/update-dependencies-action)](https://github.com/yanovian/update-dependencies-action/releases/latest) [![License: MIT](https://img.shields.io/github/license/yanovian/update-dependencies-action)](https://github.com/yanovian/update-dependencies-action/blob/master/LICENSE)
 
 **Updates your dependencies and opens a pull request, gated on your checks passing when you give it any to run.**
 
