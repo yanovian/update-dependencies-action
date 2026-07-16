@@ -67,5 +67,7 @@ async function requireLatestVersions(dir: string, declaredNames: readonly string
   if (args.length === 0) {
     return;
   }
-  await runProcess(`composer require ${args.join(' ')} --with-all-dependencies`, { cwd: dir });
+  await runProcess(`composer require ${args.join(' ')} --with-all-dependencies`, {
+    cwd: dir,
+  });
 }

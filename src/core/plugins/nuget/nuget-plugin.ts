@@ -65,9 +65,7 @@ async function applyPackageUpdate(
   const { dir, projectFile, pkg, directoryPath } = options;
   const result = await runProcess(
     `dotnet add "${projectFile}" package ${pkg.id} --version ${pkg.latestVersion}`,
-    {
-      cwd: dir,
-    },
+    { cwd: dir, allowFailure: true },
   );
   if (result.exitCode !== 0) {
     return null;

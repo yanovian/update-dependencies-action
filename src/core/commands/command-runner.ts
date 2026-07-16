@@ -35,7 +35,7 @@ export async function runCommands(
     const label = `Running command ${index + 1}/${commands.length}: ${command}`;
     const exitCode = await logger.group(label, async () => {
       logger.info(`$ ${command}`);
-      return (await runProcess(command, { cwd })).exitCode;
+      return (await runProcess(command, { cwd, allowFailure: true })).exitCode;
     });
     results.push({ command, exitCode });
     if (exitCode !== 0) {

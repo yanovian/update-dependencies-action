@@ -17,6 +17,7 @@ export async function refreshDependencyLocksIfEnabled(
   }
   const result = await runProcess(`${gradleCommand} --write-locks --console=plain -q`, {
     cwd: dir,
+    allowFailure: true,
   });
   if (result.exitCode !== 0) {
     logger.warn(
