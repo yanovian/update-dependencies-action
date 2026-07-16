@@ -1,12 +1,10 @@
 # 📦 Update Dependencies
 
-[![CI](https://github.com/yanovian/update-dependencies-action/actions/workflows/ci.yml/badge.svg)](https://github.com/yanovian/update-dependencies-action/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/yanovian/update-dependencies-action)](https://github.com/yanovian/update-dependencies-action/releases/latest)
-[![License: MIT](https://img.shields.io/github/license/yanovian/update-dependencies-action)](LICENSE)
+[![CI](https://github.com/yanovian/update-dependencies-action/actions/workflows/ci.yml/badge.svg)](https://github.com/yanovian/update-dependencies-action/actions/workflows/ci.yml) [![Latest release](https://img.shields.io/github/v/release/yanovian/update-dependencies-action)](https://github.com/yanovian/update-dependencies-action/releases/latest) [![License: MIT](https://img.shields.io/github/license/yanovian/update-dependencies-action)](https://github.com/yanovian/update-dependencies-action/blob/master/LICENSE)
 
 **Updates your dependencies and opens a pull request, gated on your checks passing when you give it any to run.**
 
-> 🛒 [Check out on the Marketplace](https://github.com/marketplace/actions/update-dependencies)
+> 🛒 [Check out on the Marketplace](https://github.com/marketplace/actions/update-dependencies) · [View source on GitHub](https://github.com/yanovian/update-dependencies-action)
 >
 > [Configuration →](_docs/configuration.md) · [Supported package managers →](_docs/supported-package-managers.md) · [FAQ →](_docs/faq-and-limitations.md)
 
