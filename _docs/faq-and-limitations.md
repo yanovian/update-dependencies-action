@@ -96,10 +96,24 @@ a first version can promise correctly.
 
 ## Does it work with a private registry?
 
-Not in this version. Every update command runs with whatever registry configuration is already
-present in the checkout (an `.npmrc`, a Maven `settings.xml`, and so on), so if your workflow
-already sets that up before this Action runs, private packages should resolve fine for detection.
-Authenticating to a private registry on this Action's behalf isn't handled separately.
+Yes, but this Action doesn't handle the authentication itself. It just runs each ecosystem's own
+update command, so it works with whatever registry credentials are already set up in the runner
+before this Action starts. Add a step before it in your workflow that authenticates, the same way
+you'd set up any other job that needs to install your private packages.
+
+## What should I use to authenticate before this Action runs?
+
+For npm, Yarn, or pnpm, use
+[`actions/setup-node`](https://github.com/actions/setup-node) with its `registry-url` input and a
+`NODE_AUTH_TOKEN` environment variable. For Maven, use
+[`actions/setup-java`](https://github.com/actions/setup-java) with `server-id`,
+`server-username`, and `server-password`, it writes your Maven `settings.xml` for you.
+
+For every other ecosystem, check your package manager's own docs for its standard way to
+authenticate, usually an environment variable or a config file in the home directory (for
+example Cargo reads `CARGO_REGISTRIES_<NAME>_TOKEN`, Bundler reads
+`BUNDLE_<GEM_SERVER_HOST>`). Set that up in a step before this Action runs and it will just work,
+this Action doesn't need to know about it.
 
 ## A note on trust
 
