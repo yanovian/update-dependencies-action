@@ -86,6 +86,8 @@ one, and what it deliberately won't touch: [`_docs/supported-package-managers.md
 
 ## What the pull request looks like
 
+![A pull request opened by Update Dependencies, showing the run date, a table of package version changes, and the security and testing-responsibility note](_docs/screenshots/pr-non-breaking.png)
+
 The pull request description lists, for every path in your repo where something changed: the
 package, the path, the version it moved from and to, and whether that change was breaking or not.
 It also lists every command that ran and passed, credits Update Dependencies, and explains why
