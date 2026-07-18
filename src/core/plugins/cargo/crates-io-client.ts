@@ -1,4 +1,5 @@
 import { fetchJsonWithRetry } from '../../security/http-retry.js';
+import { collectVersionDates } from '../../security/version-date-map.js';
 
 const USER_AGENT =
   'update-dependencies-action (https://github.com/yanovian/update-dependencies-action)';
@@ -34,12 +35,9 @@ export async function fetchCrateVersionDates(name: string): Promise<Map<string, 
   if (!response) {
     return null;
   }
-
-  const dates = new Map<string, Date>();
-  for (const version of response.versions ?? []) {
-    if (version.num && version.created_at) {
-      dates.set(version.num, new Date(version.created_at));
-    }
-  }
-  return dates;
+  return collectVersionDates(
+    response.versions ?? [],
+    (version) => version.num,
+    (version) => version.created_at,
+  );
 }

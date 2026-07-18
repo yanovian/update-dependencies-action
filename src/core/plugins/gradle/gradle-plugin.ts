@@ -7,16 +7,17 @@ import type {
   ManifestLocation,
   ManualNote,
   PackageChange,
+  PinTarget,
   PluginUpdateResult,
   UpdateContext,
   UpdateMode,
 } from '../../types/ecosystem-plugin.js';
-import { findDeclaredVersion, rewriteBuildFile } from './gradle-build-file.js';
+import { rewriteBuildFile } from './gradle-build-file.js';
 import { refreshDependencyLocksIfEnabled } from './gradle-lockfile.js';
 import { detectGradleManifests, findBuildFiles, hasVersionCatalog } from './gradle-manifest.js';
 import { fetchOutdatedGradleDependencies, resolveGradleCommand } from './gradle-report.js';
 import type { RewriteResult, UpdateCandidate } from './gradle-rewrite-result.js';
-import { rewriteVersionCatalog } from './gradle-version-catalog.js';
+import { isVersionRefShared, rewriteVersionCatalog } from './gradle-version-catalog.js';
 
 export function createGradlePlugin(): DependencyUpdatePlugin {
   return {
@@ -30,46 +31,49 @@ export function createGradlePlugin(): DependencyUpdatePlugin {
 
 /**
  * Rewrites the same declaration `updateGradle` just wrote, one more time, to the compliant
- * version. The version catalog rewriter doesn't need to know the current value (it always
- * overwrites whatever it finds for that "group:artifact"), but the plain-build-file rewriter
- * does (`rewriteBuildFile` only replaces a version it can match against `candidate.from`), so
- * that value is read back off disk first, since the file already holds this run's original,
- * too-fresh resolution rather than whatever was there before this run started.
+ * version. `target.fromVersion` is what the gate already knows is on disk right now (this run's
+ * own too-fresh resolution), so both rewriters below can target the declaration directly instead
+ * of re-deriving it by re-parsing the file.
  */
 async function pinGradleVersion(
   location: ManifestLocation,
-  name: string,
-  version: string,
+  target: PinTarget,
   ctx: UpdateContext,
 ): Promise<boolean> {
   const repoFiles = await listRepoFiles(ctx.repoRoot);
-  const target: PinTarget = { repoRoot: ctx.repoRoot, directory: location.directory };
+  const dir: PinDirectory = { repoRoot: ctx.repoRoot, directory: location.directory };
   const applied = hasVersionCatalog(repoFiles, location.directory)
-    ? await pinInVersionCatalog(target, name, version)
-    : await pinInBuildFiles(target, repoFiles, name, version);
+    ? await pinInVersionCatalog(dir, target)
+    : await pinInBuildFiles(dir, repoFiles, target);
 
   if (applied) {
-    const dir = path.join(ctx.repoRoot, location.directory);
-    const gradleCommand = await resolveGradleCommand(dir);
-    await refreshDependencyLocksIfEnabled(dir, gradleCommand, ctx.logger);
+    const absDir = path.join(dir.repoRoot, dir.directory);
+    const gradleCommand = await resolveGradleCommand(absDir);
+    await refreshDependencyLocksIfEnabled(absDir, gradleCommand, ctx.logger);
   }
   return applied;
 }
 
-interface PinTarget {
+interface PinDirectory {
   readonly repoRoot: string;
   readonly directory: string;
 }
 
-async function pinInVersionCatalog(
-  target: PinTarget,
-  groupArtifact: string,
-  version: string,
-): Promise<boolean> {
-  const catalogPath = path.join(target.repoRoot, target.directory, 'gradle', 'libs.versions.toml');
+async function pinInVersionCatalog(dir: PinDirectory, target: PinTarget): Promise<boolean> {
+  const catalogPath = path.join(dir.repoRoot, dir.directory, 'gradle', 'libs.versions.toml');
   const original = await readFile(catalogPath, 'utf8');
-  const candidates = new Map<string, UpdateCandidate>([[groupArtifact, { from: '', to: version }]]);
-  const rewrite = rewriteVersionCatalog(original, candidates, target.directory);
+
+  // A version declared via `version.ref` can be shared by more than one library; rewriting it
+  // for just this one dependency would silently move every other library on the same alias too,
+  // so this declines rather than risk corrupting a sibling's version.
+  if (isVersionRefShared(original, target.name)) {
+    return false;
+  }
+
+  const candidates = new Map<string, UpdateCandidate>([
+    [target.name, { from: target.fromVersion, to: target.version }],
+  ]);
+  const rewrite = rewriteVersionCatalog(original, candidates, dir.directory);
   if (rewrite.appliedGroupArtifacts.size === 0) {
     return false;
   }
@@ -78,23 +82,19 @@ async function pinInVersionCatalog(
 }
 
 async function pinInBuildFiles(
-  target: PinTarget,
+  dir: PinDirectory,
   repoFiles: readonly string[],
-  groupArtifact: string,
-  version: string,
+  target: PinTarget,
 ): Promise<boolean> {
+  const candidates = new Map<string, UpdateCandidate>([
+    [target.name, { from: target.fromVersion, to: target.version }],
+  ]);
+
   let applied = false;
-  for (const buildFilePath of findBuildFiles(repoFiles, target.directory)) {
-    const absPath = path.join(target.repoRoot, buildFilePath);
+  for (const buildFilePath of findBuildFiles(repoFiles, dir.directory)) {
+    const absPath = path.join(dir.repoRoot, buildFilePath);
     const original = await readFile(absPath, 'utf8');
-    const declaredVersion = findDeclaredVersion(original, groupArtifact);
-    if (!declaredVersion) {
-      continue;
-    }
-    const candidates = new Map<string, UpdateCandidate>([
-      [groupArtifact, { from: declaredVersion, to: version }],
-    ]);
-    const rewrite = rewriteBuildFile(original, candidates, target.directory);
+    const rewrite = rewriteBuildFile(original, candidates, dir.directory);
     if (rewrite.appliedGroupArtifacts.size > 0) {
       await writeFile(absPath, rewrite.content, 'utf8');
       applied = true;

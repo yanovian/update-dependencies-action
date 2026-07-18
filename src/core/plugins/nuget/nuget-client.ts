@@ -1,4 +1,5 @@
 import { fetchJsonWithRetry } from '../../security/http-retry.js';
+import { collectVersionDates } from '../../security/version-date-map.js';
 
 interface NuGetCatalogEntry {
   readonly version?: string;
@@ -29,16 +30,10 @@ export async function fetchNuGetVersionDates(packageId: string): Promise<Map<str
   if (!index) {
     return null;
   }
-
-  const dates = new Map<string, Date>();
-  for (const page of index.items ?? []) {
-    for (const leaf of page.items ?? []) {
-      const version = leaf.catalogEntry?.version;
-      const published = leaf.catalogEntry?.published;
-      if (version && published) {
-        dates.set(version, new Date(published));
-      }
-    }
-  }
-  return dates;
+  const leaves = (index.items ?? []).flatMap((page) => page.items ?? []);
+  return collectVersionDates(
+    leaves,
+    (leaf) => leaf.catalogEntry?.version,
+    (leaf) => leaf.catalogEntry?.published,
+  );
 }

@@ -22,7 +22,7 @@ export function createNpmPlugin(): DependencyUpdatePlugin {
         command: mode === 'breaking' ? BREAKING_COMMAND : NON_BREAKING_COMMAND,
         resolveVersions: resolvePackageLockVersions,
       }),
-    pinVersion: (location, name, version, ctx) =>
-      pinJsVersion((pkg) => `npm install ${pkg}`, location, { name, version }, ctx),
+    pinVersion: (location, target, ctx) =>
+      pinJsVersion((pkg) => `npm install ${pkg}`, location, target, ctx),
   };
 }

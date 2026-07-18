@@ -59,7 +59,8 @@ export function heldBackNote(
     path: change.path,
     name: change.name,
     reason:
-      `Every version of ${change.name} newer than ${change.fromVersion} is younger than the ` +
-      `${minAgeDays}-day minimum release age policy, so no update was applied this run${revertClause}.`,
+      `No version of ${change.name} newer than ${change.fromVersion} is both old enough to clear ` +
+      `the ${minAgeDays}-day minimum release age policy and free of its own known ` +
+      `vulnerabilities, so no update was applied this run${revertClause}.`,
   };
 }

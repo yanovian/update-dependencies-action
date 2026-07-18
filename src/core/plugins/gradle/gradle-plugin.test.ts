@@ -21,6 +21,7 @@ const location = {
   manifestPath: 'build.gradle',
   directory: '.',
 };
+const ctx = { repoRoot: '/repo', logger };
 
 function enoent(): NodeJS.ErrnoException {
   const error = new Error('not found') as NodeJS.ErrnoException;
@@ -33,25 +34,29 @@ beforeEach(() => {
   writeFileMock.mockReset();
   listRepoFilesMock.mockReset();
   runProcessMock.mockReset();
-  listRepoFilesMock.mockResolvedValue(['build.gradle']);
-  // No gradlew wrapper, no gradle.lockfile: resolveGradleCommand falls back to "gradle", and
-  // refreshDependencyLocksIfEnabled is a no-op since there is nothing to relock.
-  readFileMock.mockImplementation((filePath: string) => {
-    if (filePath.endsWith('build.gradle')) {
-      return Promise.resolve("implementation 'com.example:lib:1.5.0'\n");
-    }
-    return Promise.reject(enoent());
-  });
 });
 
-describe('gradle plugin pinVersion', () => {
-  it('rewrites the declared version in the plain build file', async () => {
+describe('gradle plugin pinVersion (plain build file)', () => {
+  beforeEach(() => {
+    listRepoFilesMock.mockResolvedValue(['build.gradle']);
+    // No gradlew wrapper, no gradle.lockfile, no version catalog: resolveGradleCommand falls
+    // back to "gradle", and refreshDependencyLocksIfEnabled is a no-op with nothing to relock.
+    readFileMock.mockImplementation((filePath: string) => {
+      if (filePath.endsWith('build.gradle')) {
+        return Promise.resolve("implementation 'com.example:lib:1.5.0'\n");
+      }
+      return Promise.reject(enoent());
+    });
+  });
+
+  it('rewrites the declaration using the caller-supplied fromVersion, without re-reading it', async () => {
     const plugin = createGradlePlugin();
 
-    const pinned = await plugin.pinVersion?.(location, 'com.example:lib', '1.4.0', {
-      repoRoot: '/repo',
-      logger,
-    });
+    const pinned = await plugin.pinVersion?.(
+      location,
+      { name: 'com.example:lib', fromVersion: '1.5.0', version: '1.4.0' },
+      ctx,
+    );
 
     expect(pinned).toBe(true);
     expect(writeFileMock).toHaveBeenCalledWith(
@@ -64,11 +69,89 @@ describe('gradle plugin pinVersion', () => {
   it('returns false when the dependency is not declared in any build file', async () => {
     const plugin = createGradlePlugin();
 
-    const pinned = await plugin.pinVersion?.(location, 'com.example:missing', '1.4.0', {
-      repoRoot: '/repo',
-      logger,
-    });
+    const pinned = await plugin.pinVersion?.(
+      location,
+      { name: 'com.example:missing', fromVersion: '1.5.0', version: '1.4.0' },
+      ctx,
+    );
 
+    expect(pinned).toBe(false);
+    expect(writeFileMock).not.toHaveBeenCalled();
+  });
+
+  it('returns false when the given fromVersion does not match what is actually declared', async () => {
+    const plugin = createGradlePlugin();
+
+    const pinned = await plugin.pinVersion?.(
+      location,
+      { name: 'com.example:lib', fromVersion: '1.9.9', version: '1.4.0' },
+      ctx,
+    );
+
+    expect(pinned).toBe(false);
+    expect(writeFileMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('gradle plugin pinVersion (version catalog)', () => {
+  beforeEach(() => {
+    listRepoFilesMock.mockResolvedValue(['gradle/libs.versions.toml']);
+    readFileMock.mockImplementation((filePath: string) => {
+      if (filePath.endsWith('gradlew') || filePath.endsWith('gradle.lockfile')) {
+        return Promise.reject(enoent());
+      }
+      return Promise.resolve('');
+    });
+  });
+
+  it('rewrites a library declared with its own, unshared version.ref', async () => {
+    readFileMock.mockImplementation((filePath: string) => {
+      if (filePath.endsWith('libs.versions.toml')) {
+        return Promise.resolve(
+          '[versions]\nlib-version = "1.5.0"\n\n' +
+            '[libraries]\nlib = { module = "com.example:lib", version.ref = "lib-version" }\n',
+        );
+      }
+      return Promise.reject(enoent());
+    });
+    const plugin = createGradlePlugin();
+
+    const pinned = await plugin.pinVersion?.(
+      location,
+      { name: 'com.example:lib', fromVersion: '1.5.0', version: '1.4.0' },
+      ctx,
+    );
+
+    expect(pinned).toBe(true);
+    expect(writeFileMock).toHaveBeenCalledWith(
+      expect.stringContaining('libs.versions.toml'),
+      expect.stringContaining('1.4.0'),
+      'utf8',
+    );
+  });
+
+  it('declines to pin a library whose version.ref is shared with another library', async () => {
+    readFileMock.mockImplementation((filePath: string) => {
+      if (filePath.endsWith('libs.versions.toml')) {
+        return Promise.resolve(
+          '[versions]\njackson = "2.16.0"\n\n' +
+            '[libraries]\n' +
+            'jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson" }\n' +
+            'jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }\n',
+        );
+      }
+      return Promise.reject(enoent());
+    });
+    const plugin = createGradlePlugin();
+
+    const pinned = await plugin.pinVersion?.(
+      location,
+      { name: 'com.fasterxml.jackson.core:jackson-core', fromVersion: '2.16.0', version: '2.15.0' },
+      ctx,
+    );
+
+    // Rewriting jackson-core's shared "jackson" version.ref would silently move
+    // jackson-databind's version too, so this must decline rather than risk that.
     expect(pinned).toBe(false);
     expect(writeFileMock).not.toHaveBeenCalled();
   });

@@ -1,4 +1,5 @@
 import { fetchJsonWithRetry } from '../../security/http-retry.js';
+import { collectVersionDates } from '../../security/version-date-map.js';
 
 interface RubyGemsVersionEntry {
   readonly number?: string;
@@ -13,12 +14,9 @@ export async function fetchRubyGemVersionDates(gemName: string): Promise<Map<str
   if (!entries) {
     return null;
   }
-
-  const dates = new Map<string, Date>();
-  for (const entry of entries) {
-    if (entry.number && entry.created_at) {
-      dates.set(entry.number, new Date(entry.created_at));
-    }
-  }
-  return dates;
+  return collectVersionDates(
+    entries,
+    (entry) => entry.number,
+    (entry) => entry.created_at,
+  );
 }

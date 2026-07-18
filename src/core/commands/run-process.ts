@@ -44,6 +44,13 @@ export async function runProcess(
   return result;
 }
 
+/** Shared by every plugin's `pinVersion`: run one command, allowing it to fail, and boil the
+ * result down to the one thing a pin attempt cares about, whether it worked. */
+export async function runPinCommand(command: string, cwd: string): Promise<boolean> {
+  const result = await runProcess(command, { cwd, allowFailure: true });
+  return result.exitCode === 0;
+}
+
 function spawnProcess(command: string, options: RunProcessOptions): Promise<ProcessResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, {

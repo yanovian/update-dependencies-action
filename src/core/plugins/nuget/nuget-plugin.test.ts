@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Logger } from '../../logging/logger.js';
 
 const { runProcessMock } = vi.hoisted(() => ({ runProcessMock: vi.fn() }));
-vi.mock('../../commands/run-process.js', () => ({ runProcess: runProcessMock }));
+vi.mock('../../commands/run-process.js', () => ({
+  runProcess: runProcessMock,
+  runPinCommand: async (command: string, cwd: string) => {
+    const result = await runProcessMock(command, { cwd, allowFailure: true });
+    return result.exitCode === 0;
+  },
+}));
 
 const { createNuGetPlugin } = await import('./nuget-plugin.js');
 
@@ -13,6 +19,7 @@ const location = {
   manifestPath: 'App.csproj',
   directory: '.',
 };
+const target = { name: 'Newtonsoft.Json', fromVersion: '13.0.3', version: '13.0.1' };
 
 beforeEach(() => {
   runProcessMock.mockReset();
@@ -23,10 +30,7 @@ describe('nuget plugin pinVersion', () => {
     runProcessMock.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
     const plugin = createNuGetPlugin();
 
-    const pinned = await plugin.pinVersion?.(location, 'Newtonsoft.Json', '13.0.1', {
-      repoRoot: '/repo',
-      logger,
-    });
+    const pinned = await plugin.pinVersion?.(location, target, { repoRoot: '/repo', logger });
 
     expect(pinned).toBe(true);
     expect(runProcessMock).toHaveBeenCalledWith(
@@ -39,10 +43,7 @@ describe('nuget plugin pinVersion', () => {
     runProcessMock.mockResolvedValue({ exitCode: 1, stdout: '', stderr: 'error' });
     const plugin = createNuGetPlugin();
 
-    const pinned = await plugin.pinVersion?.(location, 'Newtonsoft.Json', '13.0.1', {
-      repoRoot: '/repo',
-      logger,
-    });
+    const pinned = await plugin.pinVersion?.(location, target, { repoRoot: '/repo', logger });
 
     expect(pinned).toBe(false);
   });

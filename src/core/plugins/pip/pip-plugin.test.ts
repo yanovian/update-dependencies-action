@@ -91,10 +91,11 @@ describe('pip plugin', () => {
       readFileMock.mockResolvedValue('requests==2.31.0\nflask==3.0.0\n');
       const plugin = createPipPlugin();
 
-      const pinned = await plugin.pinVersion?.(location, 'requests', '2.25.0', {
-        repoRoot: '/repo',
-        logger,
-      });
+      const pinned = await plugin.pinVersion?.(
+        location,
+        { name: 'requests', fromVersion: '2.31.0', version: '2.25.0' },
+        { repoRoot: '/repo', logger },
+      );
 
       expect(pinned).toBe(true);
       expect(writeFileMock).toHaveBeenCalledWith(
@@ -108,10 +109,11 @@ describe('pip plugin', () => {
       readFileMock.mockResolvedValue('flask==3.0.0\n');
       const plugin = createPipPlugin();
 
-      const pinned = await plugin.pinVersion?.(location, 'requests', '2.25.0', {
-        repoRoot: '/repo',
-        logger,
-      });
+      const pinned = await plugin.pinVersion?.(
+        location,
+        { name: 'requests', fromVersion: '2.31.0', version: '2.25.0' },
+        { repoRoot: '/repo', logger },
+      );
 
       expect(pinned).toBe(false);
       expect(writeFileMock).not.toHaveBeenCalled();

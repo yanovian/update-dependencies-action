@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { runProcess } from '../../commands/run-process.js';
+import { runPinCommand, runProcess } from '../../commands/run-process.js';
 import { diffVersions } from '../../update/diff-versions.js';
 import type { Logger } from '../../logging/logger.js';
 import { readFileIfPresent } from '../../util/read-file-if-present.js';
@@ -8,30 +8,22 @@ import type {
   EcosystemId,
   ManifestLocation,
   ManualNote,
+  PinTarget,
   PluginUpdateResult,
   UpdateContext,
 } from '../../types/ecosystem-plugin.js';
 
-export interface JsPinTarget {
-  readonly name: string;
-  readonly version: string;
-}
-
 /** Shared by npm, yarn, and pnpm's `pinVersion`: each manager's own install command, given an
  * explicit `name@version`, re-resolves and re-writes the lockfile just like their regular update
  * command does, just pinned instead of "latest". */
-export async function pinJsVersion(
+export function pinJsVersion(
   installCommand: (nameAtVersion: string) => string,
   location: ManifestLocation,
-  target: JsPinTarget,
+  target: PinTarget,
   ctx: UpdateContext,
 ): Promise<boolean> {
   const dir = path.join(ctx.repoRoot, location.directory);
-  const result = await runProcess(installCommand(`${target.name}@${target.version}`), {
-    cwd: dir,
-    allowFailure: true,
-  });
-  return result.exitCode === 0;
+  return runPinCommand(installCommand(`${target.name}@${target.version}`), dir);
 }
 
 interface PackageJsonShape {

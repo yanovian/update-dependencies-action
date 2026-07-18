@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Logger } from '../../logging/logger.js';
 
 const { runProcessMock } = vi.hoisted(() => ({ runProcessMock: vi.fn() }));
-vi.mock('../../commands/run-process.js', () => ({ runProcess: runProcessMock }));
+vi.mock('../../commands/run-process.js', () => ({
+  runProcess: runProcessMock,
+  runPinCommand: async (command: string, cwd: string) => {
+    const result = await runProcessMock(command, { cwd, allowFailure: true });
+    return result.exitCode === 0;
+  },
+}));
 
 const { createGoPlugin } = await import('./go-plugin.js');
 
@@ -13,6 +19,7 @@ const location = {
   manifestPath: 'go.mod',
   directory: '.',
 };
+const target = { name: 'github.com/foo/bar', fromVersion: 'v1.3.0', version: 'v1.2.3' };
 
 beforeEach(() => {
   runProcessMock.mockReset();
@@ -23,10 +30,7 @@ describe('go plugin pinVersion', () => {
     runProcessMock.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
     const plugin = createGoPlugin();
 
-    const pinned = await plugin.pinVersion?.(location, 'github.com/foo/bar', 'v1.2.3', {
-      repoRoot: '/repo',
-      logger,
-    });
+    const pinned = await plugin.pinVersion?.(location, target, { repoRoot: '/repo', logger });
 
     expect(pinned).toBe(true);
     expect(runProcessMock).toHaveBeenNthCalledWith(
@@ -45,10 +49,7 @@ describe('go plugin pinVersion', () => {
     runProcessMock.mockResolvedValue({ exitCode: 1, stdout: '', stderr: 'error' });
     const plugin = createGoPlugin();
 
-    const pinned = await plugin.pinVersion?.(location, 'github.com/foo/bar', 'v1.2.3', {
-      repoRoot: '/repo',
-      logger,
-    });
+    const pinned = await plugin.pinVersion?.(location, target, { repoRoot: '/repo', logger });
 
     expect(pinned).toBe(false);
     expect(runProcessMock).toHaveBeenCalledTimes(1);

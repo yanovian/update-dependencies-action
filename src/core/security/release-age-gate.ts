@@ -6,12 +6,14 @@ import type {
   ManifestLocation,
   ManualNote,
   PackageChange,
+  PinTarget,
   UpdateContext,
 } from '../types/ecosystem-plugin.js';
 import { isMajorBump } from '../update/diff-versions.js';
 import { findVulnerableEntries } from './osv-client.js';
-import { pickCompliantVersion } from './release-age-candidate.js';
+import { pickSafeCompliantVersion } from './release-age-candidate.js';
 import { downgradedNote, flaggedNote, heldBackNote, unverifiedNote } from './release-age-notes.js';
+import { evaluateGroupedByManifest } from './release-age-scheduler.js';
 import { getVersionDates } from './release-date-registry.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -73,10 +75,13 @@ export async function applyReleaseAgeGate(
   const vulnerableKeys = await findVulnerableCurrentVersions(evaluable, logger);
   const dateCache = createVersionDateCache();
 
+  const outcomes = await evaluateGroupedByManifest(evaluable, (change) =>
+    evaluateChange(change, env, vulnerableKeys, dateCache),
+  );
+
   const finalChanges: PackageChange[] = [...passthrough];
   const notes: ManualNote[] = [];
-  for (const change of evaluable) {
-    const outcome = await evaluateChange(change, env, vulnerableKeys, dateCache);
+  for (const outcome of outcomes) {
     if (outcome.change) {
       finalChanges.push(outcome.change);
     }
@@ -131,11 +136,11 @@ async function applyCompliantVersion(
 ): Promise<ChangeOutcome> {
   const { change, versionDates, toDate, thresholdDate } = check;
   const location = findManifestLocation(env.manifestsUpdated, change);
-  const compliant = pickCompliantVersion(change, versionDates, thresholdDate);
+  const compliant = await pickSafeCompliantVersion(change, versionDates, thresholdDate);
 
   if (!compliant) {
     const reverted = location
-      ? await tryPin(plugin, location, { name: change.name, version: change.fromVersion }, env)
+      ? await tryPin(plugin, location, pinTarget(change, change.fromVersion), env)
       : false;
     // A successful revert means the file is genuinely back to fromVersion, so there is nothing
     // left to report. A failed revert leaves the too-fresh toVersion sitting on disk exactly as
@@ -148,7 +153,7 @@ async function applyCompliantVersion(
   }
 
   const pinned = location
-    ? await tryPin(plugin, location, { name: change.name, version: compliant.version }, env)
+    ? await tryPin(plugin, location, pinTarget(change, compliant.version), env)
     : false;
   if (!pinned) {
     return { change, note: flaggedNote(change, toDate, env.minAgeDays) };
@@ -162,6 +167,12 @@ async function applyCompliantVersion(
     },
     note: downgradedNote(change, compliant.version, env.minAgeDays),
   };
+}
+
+/** The plugin's own resolver already wrote `change.toVersion` to disk, so that (not the original
+ * pre-run `change.fromVersion`) is what's currently declared there. */
+function pinTarget(change: PackageChange, version: string): PinTarget {
+  return { name: change.name, fromVersion: change.toVersion, version };
 }
 
 interface VersionDateCache {
@@ -234,14 +245,14 @@ function findManifestLocation(
 async function tryPin(
   plugin: DependencyUpdatePlugin,
   location: ManifestLocation,
-  target: { readonly name: string; readonly version: string },
+  target: PinTarget,
   env: GateEnv,
 ): Promise<boolean> {
   if (!plugin.pinVersion) {
     return false;
   }
   try {
-    return await plugin.pinVersion(location, target.name, target.version, env.ctx);
+    return await plugin.pinVersion(location, target, env.ctx);
   } catch (error) {
     env.logger.warn(
       `Failed to pin ${target.name} to ${target.version} in ${location.directory}: ` +

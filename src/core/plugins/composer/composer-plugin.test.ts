@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Logger } from '../../logging/logger.js';
 
 const { runProcessMock } = vi.hoisted(() => ({ runProcessMock: vi.fn() }));
-vi.mock('../../commands/run-process.js', () => ({ runProcess: runProcessMock }));
+vi.mock('../../commands/run-process.js', () => ({
+  runProcess: runProcessMock,
+  runPinCommand: async (command: string, cwd: string) => {
+    const result = await runProcessMock(command, { cwd, allowFailure: true });
+    return result.exitCode === 0;
+  },
+}));
 
 const { createComposerPlugin } = await import('./composer-plugin.js');
 
@@ -13,6 +19,7 @@ const location = {
   manifestPath: 'composer.json',
   directory: '.',
 };
+const target = { name: 'monolog/monolog', fromVersion: '3.0.0', version: '2.9.1' };
 
 beforeEach(() => {
   runProcessMock.mockReset();
@@ -23,10 +30,7 @@ describe('composer plugin pinVersion', () => {
     runProcessMock.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
     const plugin = createComposerPlugin();
 
-    const pinned = await plugin.pinVersion?.(location, 'monolog/monolog', '2.9.1', {
-      repoRoot: '/repo',
-      logger,
-    });
+    const pinned = await plugin.pinVersion?.(location, target, { repoRoot: '/repo', logger });
 
     expect(pinned).toBe(true);
     expect(runProcessMock).toHaveBeenCalledWith(
@@ -39,10 +43,7 @@ describe('composer plugin pinVersion', () => {
     runProcessMock.mockResolvedValue({ exitCode: 1, stdout: '', stderr: 'error' });
     const plugin = createComposerPlugin();
 
-    const pinned = await plugin.pinVersion?.(location, 'monolog/monolog', '2.9.1', {
-      repoRoot: '/repo',
-      logger,
-    });
+    const pinned = await plugin.pinVersion?.(location, target, { repoRoot: '/repo', logger });
 
     expect(pinned).toBe(false);
   });

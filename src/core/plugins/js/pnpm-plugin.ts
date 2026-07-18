@@ -22,7 +22,7 @@ export function createPnpmPlugin(): DependencyUpdatePlugin {
         command: mode === 'breaking' ? BREAKING_COMMAND : NON_BREAKING_COMMAND,
         resolveVersions: resolvePnpmLockVersions,
       }),
-    pinVersion: (location, name, version, ctx) =>
-      pinJsVersion((pkg) => `pnpm add ${pkg}`, location, { name, version }, ctx),
+    pinVersion: (location, target, ctx) =>
+      pinJsVersion((pkg) => `pnpm add ${pkg}`, location, target, ctx),
   };
 }

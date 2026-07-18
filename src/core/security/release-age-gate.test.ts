@@ -36,6 +36,13 @@ const CHANGE: PackageChange = {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const daysAgo = (days: number): Date => new Date(Date.now() - days * DAY_MS);
 
+/** Marks exactly one version vulnerable, matching `findVulnerableEntries`'s real per-query shape. */
+async function onlyVulnerable(vulnerableVersion: string, queries: { version: string }[]) {
+  return queries
+    .filter((query) => query.version === vulnerableVersion)
+    .map((query) => ({ query, vulnerabilityIds: ['GHSA-y'] }));
+}
+
 function makeRegistry(
   plugin: Partial<DependencyUpdatePlugin> & { pinVersion?: DependencyUpdatePlugin['pinVersion'] },
 ): PluginRegistry {
@@ -124,13 +131,72 @@ describe('applyReleaseAgeGate', () => {
       logger,
     });
 
-    expect(pinVersion).toHaveBeenCalledWith(MANIFEST, 'pkg-x', '1.4.0', {
-      repoRoot: '/repo',
-      logger,
-    });
+    expect(pinVersion).toHaveBeenCalledWith(
+      MANIFEST,
+      { name: 'pkg-x', fromVersion: '1.5.0', version: '1.4.0' },
+      { repoRoot: '/repo', logger },
+    );
     expect(result.changes).toEqual([{ ...CHANGE, toVersion: '1.4.0', breaking: false }]);
     expect(result.ageGateNotes).toHaveLength(1);
     expect(result.ageGateNotes[0]?.reason).toContain('1.4.0');
+  });
+
+  it('skips a candidate that is itself vulnerable and pins the next-best one instead', async () => {
+    mocks.findVulnerableEntries.mockImplementation((queries) => onlyVulnerable('1.4.0', queries));
+    mocks.getVersionDates.mockResolvedValue(
+      new Map([
+        ['1.0.0', daysAgo(40)],
+        ['1.3.0', daysAgo(6)],
+        ['1.4.0', daysAgo(5)],
+        ['1.5.0', daysAgo(1)],
+      ]),
+    );
+    const pinVersion = vi.fn().mockResolvedValue(true);
+    const registry = makeRegistry({ pinVersion });
+
+    const result = await applyReleaseAgeGate([CHANGE], {
+      minAgeDays: 3,
+      manifestsUpdated: [MANIFEST],
+      pluginRegistry: registry,
+      repoRoot: '/repo',
+      logger,
+    });
+
+    // 1.4.0 is the newest compliant-by-age candidate, but it's itself vulnerable, so 1.3.0 (the
+    // next newest) is used instead.
+    expect(pinVersion).toHaveBeenCalledWith(
+      MANIFEST,
+      { name: 'pkg-x', fromVersion: '1.5.0', version: '1.3.0' },
+      { repoRoot: '/repo', logger },
+    );
+    expect(result.changes).toEqual([{ ...CHANGE, toVersion: '1.3.0', breaking: false }]);
+  });
+
+  it('evaluates changes across different manifests concurrently but still returns every outcome', async () => {
+    mocks.findVulnerableEntries.mockResolvedValue([]);
+    mocks.getVersionDates.mockResolvedValue(
+      new Map([
+        ['1.0.0', daysAgo(40)],
+        ['1.4.0', daysAgo(5)],
+        ['1.5.0', daysAgo(1)],
+      ]),
+    );
+    const pinVersion = vi.fn().mockResolvedValue(true);
+    const registry = makeRegistry({ pinVersion });
+    const otherManifest: ManifestLocation = { ...MANIFEST, directory: 'app-b' };
+    const otherChange: PackageChange = { ...CHANGE, name: 'pkg-y', path: 'app-b' };
+
+    const result = await applyReleaseAgeGate([CHANGE, otherChange], {
+      minAgeDays: 3,
+      manifestsUpdated: [MANIFEST, otherManifest],
+      pluginRegistry: registry,
+      repoRoot: '/repo',
+      logger,
+    });
+
+    expect(result.changes).toHaveLength(2);
+    expect(result.changes.map((change) => change.name).sort()).toEqual(['pkg-x', 'pkg-y']);
+    expect(pinVersion).toHaveBeenCalledTimes(2);
   });
 
   it('reverts and drops the change when no compliant version exists', async () => {
@@ -152,10 +218,11 @@ describe('applyReleaseAgeGate', () => {
       logger,
     });
 
-    expect(pinVersion).toHaveBeenCalledWith(MANIFEST, 'pkg-x', '1.0.0', {
-      repoRoot: '/repo',
-      logger,
-    });
+    expect(pinVersion).toHaveBeenCalledWith(
+      MANIFEST,
+      { name: 'pkg-x', fromVersion: '1.5.0', version: '1.0.0' },
+      { repoRoot: '/repo', logger },
+    );
     expect(result.changes).toEqual([]);
     expect(result.ageGateNotes).toHaveLength(1);
     expect(result.ageGateNotes[0]?.reason).toContain('no update was applied');
@@ -208,10 +275,11 @@ describe('applyReleaseAgeGate', () => {
       logger,
     });
 
-    expect(pinVersion).toHaveBeenCalledWith(MANIFEST, 'pkg-x', '1.0.0', {
-      repoRoot: '/repo',
-      logger,
-    });
+    expect(pinVersion).toHaveBeenCalledWith(
+      MANIFEST,
+      { name: 'pkg-x', fromVersion: '1.5.0', version: '1.0.0' },
+      { repoRoot: '/repo', logger },
+    );
     expect(result.changes).toEqual([]);
   });
 

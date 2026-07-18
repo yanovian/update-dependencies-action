@@ -6,6 +6,7 @@ import type {
   DependencyUpdatePlugin,
   ManifestLocation,
   PackageChange,
+  PinTarget,
   PluginUpdateResult,
   UpdateContext,
   UpdateMode,
@@ -28,13 +29,12 @@ export function createPipPlugin(): DependencyUpdatePlugin {
  * requirements.txt is the source of truth this plugin diffs against either way. */
 async function pinRequirementVersion(
   location: ManifestLocation,
-  name: string,
-  version: string,
+  target: PinTarget,
   ctx: UpdateContext,
 ): Promise<boolean> {
   const manifestAbsPath = path.join(ctx.repoRoot, location.manifestPath);
   const original = await readFile(manifestAbsPath, 'utf8');
-  const normalizedTarget = normalizePipName(name);
+  const normalizedTarget = normalizePipName(target.name);
 
   let matched = false;
   const rewritten = original
@@ -45,7 +45,7 @@ async function pinRequirementVersion(
         return line;
       }
       matched = true;
-      return line.replace(/==\s*[^\s#;]+/, `==${version}`);
+      return line.replace(/==\s*[^\s#;]+/, `==${target.version}`);
     })
     .join('\n');
 

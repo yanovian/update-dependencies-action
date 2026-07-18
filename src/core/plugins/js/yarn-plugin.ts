@@ -22,7 +22,7 @@ export function createYarnPlugin(): DependencyUpdatePlugin {
         command: mode === 'breaking' ? BREAKING_COMMAND : NON_BREAKING_COMMAND,
         resolveVersions: resolveYarnVersions,
       }),
-    pinVersion: (location, name, version, ctx) =>
-      pinJsVersion((pkg) => `yarn add ${pkg}`, location, { name, version }, ctx),
+    pinVersion: (location, target, ctx) =>
+      pinJsVersion((pkg) => `yarn add ${pkg}`, location, target, ctx),
   };
 }

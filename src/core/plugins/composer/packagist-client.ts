@@ -1,4 +1,5 @@
 import { fetchJsonWithRetry } from '../../security/http-retry.js';
+import { collectVersionDates } from '../../security/version-date-map.js';
 
 interface PackagistVersionEntry {
   readonly version?: string;
@@ -23,13 +24,9 @@ export async function fetchComposerVersionDates(
   if (!response) {
     return null;
   }
-
-  const entries = response.packages?.[packageName] ?? [];
-  const dates = new Map<string, Date>();
-  for (const entry of entries) {
-    if (entry.version && entry.time) {
-      dates.set(entry.version, new Date(entry.time));
-    }
-  }
-  return dates;
+  return collectVersionDates(
+    response.packages?.[packageName] ?? [],
+    (entry) => entry.version,
+    (entry) => entry.time,
+  );
 }

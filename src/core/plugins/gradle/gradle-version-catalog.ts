@@ -31,6 +31,30 @@ function groupArtifactOf(lib: CatalogLibraryValue): string | null {
   return lib.group && lib.name ? `${lib.group}:${lib.name}` : null;
 }
 
+function versionRefOf(lib: CatalogLibraryValue): string | null {
+  return typeof lib.version === 'object' ? (lib.version.ref ?? null) : null;
+}
+
+/**
+ * True when this "group:artifact"'s declared version is a `version.ref` also used by at least
+ * one other library. Rewriting it via a single-entry candidate map (as the release-age gate's
+ * pin path does) would move the shared `[versions]` entry, silently changing every other library
+ * that references the same alias too, so the caller should decline to pin rather than risk that.
+ */
+export function isVersionRefShared(original: string, groupArtifact: string): boolean {
+  const libraries = Object.values((parseToml(original) as CatalogShape).libraries ?? {}).filter(
+    (lib): lib is CatalogLibraryValue => typeof lib !== 'string',
+  );
+  const ref = libraries
+    .filter((lib) => groupArtifactOf(lib) === groupArtifact)
+    .map(versionRefOf)
+    .find((value): value is string => value !== null);
+  if (!ref) {
+    return false;
+  }
+  return libraries.filter((lib) => versionRefOf(lib) === ref).length > 1;
+}
+
 function recordChange(ctx: RewriteCtx, groupArtifact: string, candidate: UpdateCandidate): void {
   ctx.result.changes.push({
     ecosystem: 'gradle',

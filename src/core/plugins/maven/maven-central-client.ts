@@ -1,4 +1,5 @@
 import { fetchJsonWithRetry } from '../../security/http-retry.js';
+import { collectVersionDates } from '../../security/version-date-map.js';
 
 interface MavenSearchDoc {
   readonly v?: string;
@@ -26,12 +27,9 @@ export async function fetchMavenVersionDates(
   if (!response) {
     return null;
   }
-
-  const dates = new Map<string, Date>();
-  for (const doc of response.response?.docs ?? []) {
-    if (doc.v && doc.timestamp) {
-      dates.set(doc.v, new Date(doc.timestamp));
-    }
-  }
-  return dates;
+  return collectVersionDates(
+    response.response?.docs ?? [],
+    (doc) => doc.v,
+    (doc) => doc.timestamp,
+  );
 }

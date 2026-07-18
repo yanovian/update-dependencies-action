@@ -72,6 +72,16 @@ export interface UpdateContext {
   readonly logger: Logger;
 }
 
+/** What `pinVersion` should change one dependency to, and what it's currently declared at.
+ * Carrying `fromVersion` lets a plugin whose rewriter needs to match the current declaration
+ * (e.g. Gradle's plain build-file notation) target it directly, instead of re-deriving it by
+ * re-reading and re-parsing the file its own `update()` just wrote. */
+export interface PinTarget {
+  readonly name: string;
+  readonly fromVersion: string;
+  readonly version: string;
+}
+
 export interface DependencyUpdatePlugin {
   readonly id: EcosystemId;
   readonly language: string;
@@ -90,10 +100,5 @@ export interface DependencyUpdatePlugin {
    * the change instead of adjusting it. Returns false (not a throw) on failure, since a failed
    * pin attempt is itself a normal, expected outcome the gate needs to react to.
    */
-  pinVersion?(
-    location: ManifestLocation,
-    name: string,
-    version: string,
-    ctx: UpdateContext,
-  ): Promise<boolean>;
+  pinVersion?(location: ManifestLocation, target: PinTarget, ctx: UpdateContext): Promise<boolean>;
 }

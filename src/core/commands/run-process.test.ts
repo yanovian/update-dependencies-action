@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runProcess } from './run-process.js';
+import { runPinCommand, runProcess } from './run-process.js';
 
 describe('runProcess', () => {
   it('resolves with the result when the command succeeds', async () => {
@@ -31,5 +31,15 @@ describe('runProcess', () => {
   it('resolves instead of throwing when allowFailure is set', async () => {
     const result = await runProcess('exit 3', { cwd: process.cwd(), allowFailure: true });
     expect(result.exitCode).toBe(3);
+  });
+});
+
+describe('runPinCommand', () => {
+  it('resolves true when the command succeeds', async () => {
+    await expect(runPinCommand('exit 0', process.cwd())).resolves.toBe(true);
+  });
+
+  it('resolves false, without throwing, when the command fails', async () => {
+    await expect(runPinCommand('exit 1', process.cwd())).resolves.toBe(false);
   });
 });

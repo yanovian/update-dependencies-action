@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { runProcess } from '../../commands/run-process.js';
+import { runPinCommand, runProcess } from '../../commands/run-process.js';
 import { diffVersions } from '../../update/diff-versions.js';
 import type {
   DependencyUpdatePlugin,
   ManifestLocation,
+  PinTarget,
   PluginUpdateResult,
   UpdateContext,
   UpdateMode,
@@ -25,18 +26,16 @@ export function createComposerPlugin(): DependencyUpdatePlugin {
 
 /** Same call breaking mode's `requireLatestVersions` already makes, parameterized to an exact
  * version instead of the latest one. */
-async function pinComposerVersion(
+function pinComposerVersion(
   location: ManifestLocation,
-  name: string,
-  version: string,
+  target: PinTarget,
   ctx: UpdateContext,
 ): Promise<boolean> {
   const dir = path.join(ctx.repoRoot, location.directory);
-  const result = await runProcess(`composer require ${name}:${version} --with-all-dependencies`, {
-    cwd: dir,
-    allowFailure: true,
-  });
-  return result.exitCode === 0;
+  return runPinCommand(
+    `composer require ${target.name}:${target.version} --with-all-dependencies`,
+    dir,
+  );
 }
 
 async function updateComposer(

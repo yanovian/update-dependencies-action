@@ -7,7 +7,13 @@ const { readFileMock, runProcessMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('node:fs/promises', () => ({ readFile: readFileMock }));
-vi.mock('../../commands/run-process.js', () => ({ runProcess: runProcessMock }));
+vi.mock('../../commands/run-process.js', () => ({
+  runProcess: runProcessMock,
+  runPinCommand: async (command: string, cwd: string) => {
+    const result = await runProcessMock(command, { cwd, allowFailure: true });
+    return result.exitCode === 0;
+  },
+}));
 
 const { detectJsManifests, detectNpmManifests, pinJsVersion, runJsUpdate } =
   await import('./js-manifest.js');
@@ -237,7 +243,7 @@ describe('pinJsVersion', () => {
     const pinned = await pinJsVersion(
       installCommand,
       location,
-      { name: 'left-pad', version: '1.2.3' },
+      { name: 'left-pad', fromVersion: '1.1.0', version: '1.2.3' },
       { repoRoot: '/repo', logger },
     );
 
@@ -255,7 +261,7 @@ describe('pinJsVersion', () => {
     const pinned = await pinJsVersion(
       (pkg) => `npm install ${pkg}`,
       location,
-      { name: 'left-pad', version: '1.2.3' },
+      { name: 'left-pad', fromVersion: '1.1.0', version: '1.2.3' },
       { repoRoot: '/repo', logger },
     );
 

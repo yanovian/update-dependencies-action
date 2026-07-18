@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { runProcess } from '../../commands/run-process.js';
+import { runPinCommand, runProcess } from '../../commands/run-process.js';
 import { diffVersions } from '../../update/diff-versions.js';
 import type {
   DependencyUpdatePlugin,
   ManifestLocation,
+  PinTarget,
   PluginUpdateResult,
   UpdateContext,
   UpdateMode,
@@ -27,19 +28,17 @@ export function createMavenPlugin(): DependencyUpdatePlugin {
 /** `use-dep-version` is versions-maven-plugin's own goal for forcing one dependency to an exact
  * version; `-DforceVersion=true` is required since the release-age gate can ask for an older
  * version than what's currently declared, which the plugin otherwise refuses as a downgrade. */
-async function pinMavenVersion(
+function pinMavenVersion(
   location: ManifestLocation,
-  name: string,
-  version: string,
+  target: PinTarget,
   ctx: UpdateContext,
 ): Promise<boolean> {
   const dir = path.join(ctx.repoRoot, location.directory);
-  const result = await runProcess(
-    `mvn -B ${VERSIONS_PLUGIN}:use-dep-version -Dincludes=${name} -DdepVersion=${version} ` +
-      `-DforceVersion=true ${VERSIONS_PLUGIN}:commit`,
-    { cwd: dir, allowFailure: true },
+  return runPinCommand(
+    `mvn -B ${VERSIONS_PLUGIN}:use-dep-version -Dincludes=${target.name} ` +
+      `-DdepVersion=${target.version} -DforceVersion=true ${VERSIONS_PLUGIN}:commit`,
+    dir,
   );
-  return result.exitCode === 0;
 }
 
 async function updateMaven(
