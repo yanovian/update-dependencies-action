@@ -3,7 +3,7 @@ import type { EcosystemId, PackageChange } from '../types/ecosystem-plugin.js';
 /** Extracts the leading integer of a version string, good enough across every ecosystem's
  * versioning scheme (semver, PEP 440, Maven's dotted scheme, etc.) since they all start with a
  * numeric major component. */
-function majorOf(version: string): number | null {
+export function majorOf(version: string): number | null {
   const match = /(\d+)/.exec(version);
   return match ? Number(match[1]) : null;
 }

@@ -9,7 +9,8 @@ const { readFileMock, runProcessMock } = vi.hoisted(() => ({
 vi.mock('node:fs/promises', () => ({ readFile: readFileMock }));
 vi.mock('../../commands/run-process.js', () => ({ runProcess: runProcessMock }));
 
-const { detectJsManifests, detectNpmManifests, runJsUpdate } = await import('./js-manifest.js');
+const { detectJsManifests, detectNpmManifests, pinJsVersion, runJsUpdate } =
+  await import('./js-manifest.js');
 
 const logger: Logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), group: (_name, fn) => fn() };
 const location = {
@@ -226,5 +227,38 @@ describe('runJsUpdate', () => {
         indirect: true,
       },
     ]);
+  });
+});
+
+describe('pinJsVersion', () => {
+  it('runs the given install command with an explicit name@version', async () => {
+    const installCommand = vi.fn((pkg: string) => `npm install ${pkg}`);
+
+    const pinned = await pinJsVersion(
+      installCommand,
+      location,
+      { name: 'left-pad', version: '1.2.3' },
+      { repoRoot: '/repo', logger },
+    );
+
+    expect(pinned).toBe(true);
+    expect(installCommand).toHaveBeenCalledWith('left-pad@1.2.3');
+    expect(runProcessMock).toHaveBeenCalledWith(
+      'npm install left-pad@1.2.3',
+      expect.objectContaining({ allowFailure: true }),
+    );
+  });
+
+  it('returns false when the install command fails', async () => {
+    runProcessMock.mockResolvedValue({ exitCode: 1, stdout: '' });
+
+    const pinned = await pinJsVersion(
+      (pkg) => `npm install ${pkg}`,
+      location,
+      { name: 'left-pad', version: '1.2.3' },
+      { repoRoot: '/repo', logger },
+    );
+
+    expect(pinned).toBe(false);
   });
 });

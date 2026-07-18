@@ -19,7 +19,24 @@ export function createComposerPlugin(): DependencyUpdatePlugin {
     language: 'PHP',
     detectManifests: detectComposerManifests,
     update: updateComposer,
+    pinVersion: pinComposerVersion,
   };
+}
+
+/** Same call breaking mode's `requireLatestVersions` already makes, parameterized to an exact
+ * version instead of the latest one. */
+async function pinComposerVersion(
+  location: ManifestLocation,
+  name: string,
+  version: string,
+  ctx: UpdateContext,
+): Promise<boolean> {
+  const dir = path.join(ctx.repoRoot, location.directory);
+  const result = await runProcess(`composer require ${name}:${version} --with-all-dependencies`, {
+    cwd: dir,
+    allowFailure: true,
+  });
+  return result.exitCode === 0;
 }
 
 async function updateComposer(

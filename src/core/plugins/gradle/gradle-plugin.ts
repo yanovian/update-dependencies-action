@@ -11,7 +11,7 @@ import type {
   UpdateContext,
   UpdateMode,
 } from '../../types/ecosystem-plugin.js';
-import { rewriteBuildFile } from './gradle-build-file.js';
+import { findDeclaredVersion, rewriteBuildFile } from './gradle-build-file.js';
 import { refreshDependencyLocksIfEnabled } from './gradle-lockfile.js';
 import { detectGradleManifests, findBuildFiles, hasVersionCatalog } from './gradle-manifest.js';
 import { fetchOutdatedGradleDependencies, resolveGradleCommand } from './gradle-report.js';
@@ -24,7 +24,83 @@ export function createGradlePlugin(): DependencyUpdatePlugin {
     language: 'Java/JVM (Gradle)',
     detectManifests: detectGradleManifests,
     update: updateGradle,
+    pinVersion: pinGradleVersion,
   };
+}
+
+/**
+ * Rewrites the same declaration `updateGradle` just wrote, one more time, to the compliant
+ * version. The version catalog rewriter doesn't need to know the current value (it always
+ * overwrites whatever it finds for that "group:artifact"), but the plain-build-file rewriter
+ * does (`rewriteBuildFile` only replaces a version it can match against `candidate.from`), so
+ * that value is read back off disk first, since the file already holds this run's original,
+ * too-fresh resolution rather than whatever was there before this run started.
+ */
+async function pinGradleVersion(
+  location: ManifestLocation,
+  name: string,
+  version: string,
+  ctx: UpdateContext,
+): Promise<boolean> {
+  const repoFiles = await listRepoFiles(ctx.repoRoot);
+  const target: PinTarget = { repoRoot: ctx.repoRoot, directory: location.directory };
+  const applied = hasVersionCatalog(repoFiles, location.directory)
+    ? await pinInVersionCatalog(target, name, version)
+    : await pinInBuildFiles(target, repoFiles, name, version);
+
+  if (applied) {
+    const dir = path.join(ctx.repoRoot, location.directory);
+    const gradleCommand = await resolveGradleCommand(dir);
+    await refreshDependencyLocksIfEnabled(dir, gradleCommand, ctx.logger);
+  }
+  return applied;
+}
+
+interface PinTarget {
+  readonly repoRoot: string;
+  readonly directory: string;
+}
+
+async function pinInVersionCatalog(
+  target: PinTarget,
+  groupArtifact: string,
+  version: string,
+): Promise<boolean> {
+  const catalogPath = path.join(target.repoRoot, target.directory, 'gradle', 'libs.versions.toml');
+  const original = await readFile(catalogPath, 'utf8');
+  const candidates = new Map<string, UpdateCandidate>([[groupArtifact, { from: '', to: version }]]);
+  const rewrite = rewriteVersionCatalog(original, candidates, target.directory);
+  if (rewrite.appliedGroupArtifacts.size === 0) {
+    return false;
+  }
+  await writeFile(catalogPath, rewrite.content, 'utf8');
+  return true;
+}
+
+async function pinInBuildFiles(
+  target: PinTarget,
+  repoFiles: readonly string[],
+  groupArtifact: string,
+  version: string,
+): Promise<boolean> {
+  let applied = false;
+  for (const buildFilePath of findBuildFiles(repoFiles, target.directory)) {
+    const absPath = path.join(target.repoRoot, buildFilePath);
+    const original = await readFile(absPath, 'utf8');
+    const declaredVersion = findDeclaredVersion(original, groupArtifact);
+    if (!declaredVersion) {
+      continue;
+    }
+    const candidates = new Map<string, UpdateCandidate>([
+      [groupArtifact, { from: declaredVersion, to: version }],
+    ]);
+    const rewrite = rewriteBuildFile(original, candidates, target.directory);
+    if (rewrite.appliedGroupArtifacts.size > 0) {
+      await writeFile(absPath, rewrite.content, 'utf8');
+      applied = true;
+    }
+  }
+  return applied;
 }
 
 async function updateGradle(

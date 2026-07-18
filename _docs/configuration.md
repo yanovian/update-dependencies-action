@@ -10,6 +10,7 @@ ecosystems and paths to skip.
 | --- | --- | --- |
 | `update-strategy` | `non-breaking` | `non-breaking` keeps every package within its current major version. `breaking` allows major version jumps too. |
 | `check-commands` | (empty) | Commands to run after updating, one per line, in order. Every command must exit 0 or no pull request is created. Leave empty to rely on your repo's own pull request CI instead, see [check-commands or your own CI](faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use) in the FAQ. |
+| `min-release-age-days` | `3` | Minimum number of days a version must have been published before this Action will update to it. A version that fixes a known vulnerability always bypasses this. Set to `0` to disable. See [release-age policy](#release-age-policy) below. |
 | `create-pull-request` | `true` | Whether to open a pull request when there are updates and every command passed. Set to `false` to leave the updated files in the working tree instead, for example if you want to commit them yourself in a later step. |
 | `base-branch` | repo default branch | Branch the pull request is opened against. |
 | `branch-name` | `chore/update-deps/<update-strategy>` | Prefix for the branch this Action commits to. The actual branch is `<branch-name>/<run-date>`, see [does it create a new pull request every time it runs](faq-and-limitations.md#does-it-create-a-new-pull-request-every-time-it-runs) in the FAQ. Example: [`examples/with-branch-name/`](../examples/with-branch-name/). |
@@ -26,6 +27,29 @@ ecosystems and paths to skip.
 | `pull-request-url` | URL of the pull request that was created or updated, if any. |
 | `changes-summary-path` | Path to a JSON file with every change and manual-action note from this run. Written outside the repo checkout (the runner's temp directory), never committed. |
 | `commands-passed` | `true` if every command in `check-commands` exited successfully. |
+
+## Release-age policy
+
+A version that was just published is also the version an attacker's compromised release would
+look like, before anyone has had a chance to notice. `min-release-age-days` (default `3`) holds
+back any update that resolves to a version younger than that, walking it back to the newest
+version old enough to clear the policy instead, for npm, Yarn, pnpm, pip, Cargo, Go, Maven,
+Gradle, Composer, and NuGet. Bundler has no way to pin a single gem to an exact version without
+editing the Gemfile, so a too-fresh RubyGems update is flagged in the pull request body instead of
+adjusted.
+
+A version that fixes a known vulnerability (checked against
+[OSV.dev](https://osv.dev)'s public API) always bypasses this, the same tradeoff Dependabot's own
+minimum release age makes: waiting out a routine update is fine, waiting on a security fix isn't.
+
+This needs no persistent state or backend of any kind. Every check is a registry lookup made
+fresh on the run itself (how old is this specific version, right now), same as any other request
+this Action already makes to a package registry. Registry or OSV.dev lookups that don't come back
+within a bounded retry window fail open: the update is let through, flagged in the pull request as
+unverified, rather than a rate-limited registry making the whole run unreliable.
+
+Set `min-release-age-days: 0` to disable this entirely and go back to always updating to whatever
+is latest.
 
 ## Config file
 

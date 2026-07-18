@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   createOrUpdatePullRequest: vi.fn(),
   findStalePullRequests: vi.fn(),
   resolveBaseBranch: vi.fn(),
+  applyReleaseAgeGate: vi.fn(),
+  readActionInputs: vi.fn(),
 }));
 
 vi.mock('../core/discovery/list-repo-files.js', () => ({ listRepoFiles: mocks.listRepoFiles }));
@@ -46,21 +48,25 @@ vi.mock('../core/github/pr-manager.js', () => ({
   findStalePullRequests: mocks.findStalePullRequests,
 }));
 vi.mock('../core/github/base-branch.js', () => ({ resolveBaseBranch: mocks.resolveBaseBranch }));
+vi.mock('../core/security/release-age-gate.js', () => ({
+  applyReleaseAgeGate: mocks.applyReleaseAgeGate,
+}));
 vi.mock('../core/plugins/all-plugins.js', () => ({ createAllPlugins: () => [] }));
 vi.mock('../core/util/current-date.js', () => ({ getUtcDateString: () => '2026-07-16' }));
 
-vi.mock('./inputs.js', () => ({
-  readActionInputs: () => ({
-    updateStrategy: 'non-breaking',
-    checkCommands: 'npm test',
-    createPullRequest: true,
-    baseBranch: '',
-    branchName: 'chore/update-deps/non-breaking',
-    configPath: '.github/update-dependencies.yml',
-    workingDirectory: '.',
-    githubToken: 'token',
-  }),
-}));
+vi.mock('./inputs.js', () => ({ readActionInputs: mocks.readActionInputs }));
+
+const DEFAULT_INPUTS = {
+  updateStrategy: 'non-breaking' as const,
+  checkCommands: 'npm test',
+  createPullRequest: true,
+  baseBranch: '',
+  branchName: 'chore/update-deps/non-breaking',
+  configPath: '.github/update-dependencies.yml',
+  workingDirectory: '.',
+  githubToken: 'token',
+  minReleaseAgeDays: 0,
+};
 
 const { run } = await import('./run.js');
 
@@ -82,6 +88,7 @@ const MANIFEST = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.readActionInputs.mockReturnValue(DEFAULT_INPUTS);
   mocks.listRepoFiles.mockResolvedValue([]);
   mocks.loadConfig.mockResolvedValue({ version: 1, ecosystems: {}, ignorePaths: [] });
   mocks.writeSummaryToDisk.mockResolvedValue('/repo/update-dependencies-summary.json');
@@ -174,5 +181,79 @@ describe('run', () => {
       expect.objectContaining({ updated: true, commandsPassed: true, pullRequestNumber: 42 }),
     );
     expect(mocks.setFailed).not.toHaveBeenCalled();
+  });
+
+  it('skips the release-age gate entirely when min-release-age-days is 0', async () => {
+    mocks.updateRepo.mockResolvedValue({
+      manifestsUpdated: [],
+      changes: [],
+      manualActionNeeded: [],
+    });
+
+    await run(logger);
+
+    expect(mocks.applyReleaseAgeGate).not.toHaveBeenCalled();
+  });
+
+  it('applies the release-age gate and uses its adjusted changes when min-release-age-days is set', async () => {
+    mocks.readActionInputs.mockReturnValue({ ...DEFAULT_INPUTS, minReleaseAgeDays: 3 });
+    mocks.updateRepo.mockResolvedValue({
+      manifestsUpdated: [MANIFEST],
+      changes: [CHANGE],
+      manualActionNeeded: [],
+    });
+    const gatedChange = { ...CHANGE, toVersion: '1.0.5' };
+    mocks.applyReleaseAgeGate.mockResolvedValue({
+      changes: [gatedChange],
+      ageGateNotes: [{ ecosystem: 'npm' as const, path: '.', name: 'left-pad', reason: 'capped' }],
+    });
+    mocks.runCommands.mockResolvedValue({ results: [], allSucceeded: true, failedCommand: null });
+
+    await run(logger);
+
+    expect(mocks.applyReleaseAgeGate).toHaveBeenCalledWith(
+      [CHANGE],
+      expect.objectContaining({ minAgeDays: 3 }),
+    );
+    expect(mocks.commit).toHaveBeenCalledWith(['.'], expect.any(String));
+    expect(mocks.writeSummaryToDisk).toHaveBeenCalledWith(
+      expect.objectContaining({
+        changes: [gatedChange],
+        ageGateNotes: [expect.objectContaining({ name: 'left-pad' })],
+      }),
+      expect.any(String),
+    );
+  });
+
+  it('treats the gate holding every change back as nothing changed, skipping commands and the PR', async () => {
+    mocks.readActionInputs.mockReturnValue({ ...DEFAULT_INPUTS, minReleaseAgeDays: 3 });
+    mocks.updateRepo.mockResolvedValue({
+      manifestsUpdated: [MANIFEST],
+      changes: [CHANGE],
+      manualActionNeeded: [],
+    });
+    mocks.applyReleaseAgeGate.mockResolvedValue({
+      changes: [],
+      ageGateNotes: [
+        { ecosystem: 'npm' as const, path: '.', name: 'left-pad', reason: 'held back' },
+      ],
+    });
+
+    await run(logger);
+
+    // A note with no accompanying change means the file was successfully reverted, so there is
+    // nothing to commit; proceeding to `git commit` here would fail outright on a clean tree.
+    expect(mocks.runCommands).not.toHaveBeenCalled();
+    expect(mocks.createOrUpdatePullRequest).not.toHaveBeenCalled();
+    expect(mocks.writeSummaryToDisk).toHaveBeenCalledWith(
+      expect.objectContaining({
+        changes: [],
+        ageGateNotes: [expect.objectContaining({ name: 'left-pad' })],
+      }),
+      expect.any(String),
+    );
+    expect(mocks.setActionOutputs).toHaveBeenCalledWith(
+      expect.objectContaining({ updated: false, commandsPassed: true }),
+    );
   });
 });

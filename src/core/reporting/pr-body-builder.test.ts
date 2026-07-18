@@ -16,6 +16,15 @@ const STALE_PR = {
   branchName: 'chore/update-deps/non-breaking/2026-07-01',
 };
 
+const BASE_OPTIONS = {
+  manualActionNeeded: [],
+  ageGateNotes: [],
+  minReleaseAgeDays: 3,
+  commandResults: [],
+  runDate: '2026-07-16',
+  stalePullRequests: [],
+};
+
 describe('buildPullRequestTitle', () => {
   it('counts unique packages and paths, and includes the run date', () => {
     const title = buildPullRequestTitle(
@@ -32,12 +41,10 @@ describe('buildPullRequestTitle', () => {
 describe('buildPullRequestBody', () => {
   it('includes the run date, changes table, commands run, security note, and footer', () => {
     const body = buildPullRequestBody({
+      ...BASE_OPTIONS,
       mode: 'non-breaking',
       changes: [CHANGE],
-      manualActionNeeded: [],
       commandResults: [{ command: 'npm test', exitCode: 0 }],
-      runDate: '2026-07-16',
-      stalePullRequests: [],
     });
 
     expect(body).toContain('**Run date:** 2026-07-16');
@@ -48,64 +55,71 @@ describe('buildPullRequestBody', () => {
     expect(body).toContain('responsibility of the dev, QA, and test teams');
   });
 
+  it('mentions the release-age policy in the run date note when enabled', () => {
+    const body = buildPullRequestBody({ ...BASE_OPTIONS, mode: 'non-breaking', changes: [CHANGE] });
+    expect(body).toContain('Versions younger than 3 day(s) are held back');
+  });
+
+  it('omits the release-age policy note when the gate is disabled', () => {
+    const body = buildPullRequestBody({
+      ...BASE_OPTIONS,
+      mode: 'non-breaking',
+      changes: [CHANGE],
+      minReleaseAgeDays: 0,
+    });
+    expect(body).not.toContain('held back');
+  });
+
   it('labels a range-only change as indirect', () => {
     const body = buildPullRequestBody({
+      ...BASE_OPTIONS,
       mode: 'non-breaking',
       changes: [{ ...CHANGE, breaking: false, indirect: true }],
-      manualActionNeeded: [],
-      commandResults: [],
-      runDate: '2026-07-16',
-      stalePullRequests: [],
     });
     expect(body).toContain('| npm | app | left-pad | 1.0.0 | 2.0.0 | Non-breaking (indirect) |');
   });
 
   it('includes a manual-action-needed section when there is one', () => {
     const body = buildPullRequestBody({
+      ...BASE_OPTIONS,
       mode: 'breaking',
       changes: [],
       manualActionNeeded: [
         { ecosystem: 'go', path: '.', name: 'github.com/foo/bar', reason: 'new major available' },
       ],
-      commandResults: [],
-      runDate: '2026-07-16',
-      stalePullRequests: [],
     });
     expect(body).toContain('Needs a manual look');
     expect(body).toContain('new major available');
   });
 
-  it('omits the commands section when no commands were run', () => {
+  it('includes a release-age policy section when there are age-gate notes', () => {
     const body = buildPullRequestBody({
+      ...BASE_OPTIONS,
       mode: 'non-breaking',
       changes: [CHANGE],
-      manualActionNeeded: [],
-      commandResults: [],
-      runDate: '2026-07-16',
-      stalePullRequests: [],
+      ageGateNotes: [
+        { ecosystem: 'npm', path: 'app', name: 'left-pad', reason: 'capped to an older version' },
+      ],
     });
+    expect(body).toContain('## Release-age policy');
+    expect(body).toContain('capped to an older version');
+  });
+
+  it('omits the commands section when no commands were run', () => {
+    const body = buildPullRequestBody({ ...BASE_OPTIONS, mode: 'non-breaking', changes: [CHANGE] });
     expect(body).not.toContain('Commands run');
   });
 
   it('omits the stale pull requests section when there are none', () => {
-    const body = buildPullRequestBody({
-      mode: 'non-breaking',
-      changes: [CHANGE],
-      manualActionNeeded: [],
-      commandResults: [],
-      runDate: '2026-07-16',
-      stalePullRequests: [],
-    });
+    const body = buildPullRequestBody({ ...BASE_OPTIONS, mode: 'non-breaking', changes: [CHANGE] });
     expect(body).not.toContain('Other open pull requests');
   });
 
   it('lists stale pull requests and recommends closing them, with a disclaimer', () => {
     const body = buildPullRequestBody({
+      ...BASE_OPTIONS,
       mode: 'non-breaking',
       changes: [CHANGE],
-      manualActionNeeded: [],
-      commandResults: [],
-      runDate: '2026-07-16',
       stalePullRequests: [STALE_PR],
     });
     expect(body).toContain('Other open pull requests from this Action');

@@ -85,4 +85,36 @@ describe('pip plugin', () => {
       },
     ]);
   });
+
+  describe('pinVersion', () => {
+    it('rewrites the matching pin to the exact requested version', async () => {
+      readFileMock.mockResolvedValue('requests==2.31.0\nflask==3.0.0\n');
+      const plugin = createPipPlugin();
+
+      const pinned = await plugin.pinVersion?.(location, 'requests', '2.25.0', {
+        repoRoot: '/repo',
+        logger,
+      });
+
+      expect(pinned).toBe(true);
+      expect(writeFileMock).toHaveBeenCalledWith(
+        expect.stringContaining('requirements.txt'),
+        'requests==2.25.0\nflask==3.0.0\n',
+        'utf8',
+      );
+    });
+
+    it('returns false when there is no matching pin to rewrite', async () => {
+      readFileMock.mockResolvedValue('flask==3.0.0\n');
+      const plugin = createPipPlugin();
+
+      const pinned = await plugin.pinVersion?.(location, 'requests', '2.25.0', {
+        repoRoot: '/repo',
+        logger,
+      });
+
+      expect(pinned).toBe(false);
+      expect(writeFileMock).not.toHaveBeenCalled();
+    });
+  });
 });

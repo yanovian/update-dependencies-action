@@ -25,7 +25,24 @@ export function createCargoPlugin(): DependencyUpdatePlugin {
     language: 'Rust',
     detectManifests: detectCargoManifests,
     update: updateCargo,
+    pinVersion: pinCargoVersion,
   };
+}
+
+/** `--precise` is cargo's own documented flag for pinning one crate to an exact version while
+ * still letting it resolve the rest of the dependency graph normally. */
+async function pinCargoVersion(
+  location: ManifestLocation,
+  name: string,
+  version: string,
+  ctx: UpdateContext,
+): Promise<boolean> {
+  const dir = path.join(ctx.repoRoot, location.directory);
+  const result = await runProcess(`cargo update -p ${name} --precise ${version}`, {
+    cwd: dir,
+    allowFailure: true,
+  });
+  return result.exitCode === 0;
 }
 
 async function updateCargo(

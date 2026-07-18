@@ -12,6 +12,28 @@ import type {
   UpdateContext,
 } from '../../types/ecosystem-plugin.js';
 
+export interface JsPinTarget {
+  readonly name: string;
+  readonly version: string;
+}
+
+/** Shared by npm, yarn, and pnpm's `pinVersion`: each manager's own install command, given an
+ * explicit `name@version`, re-resolves and re-writes the lockfile just like their regular update
+ * command does, just pinned instead of "latest". */
+export async function pinJsVersion(
+  installCommand: (nameAtVersion: string) => string,
+  location: ManifestLocation,
+  target: JsPinTarget,
+  ctx: UpdateContext,
+): Promise<boolean> {
+  const dir = path.join(ctx.repoRoot, location.directory);
+  const result = await runProcess(installCommand(`${target.name}@${target.version}`), {
+    cwd: dir,
+    allowFailure: true,
+  });
+  return result.exitCode === 0;
+}
+
 interface PackageJsonShape {
   readonly dependencies?: Record<string, string>;
   readonly devDependencies?: Record<string, string>;

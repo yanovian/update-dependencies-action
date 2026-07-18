@@ -14,6 +14,10 @@ inputs:
     description: 'Commands to run after updating, one per line, in order. Every command must succeed or no pull request is created.'
     required: false
     default: ''
+  min-release-age-days:
+    description: 'Minimum number of days a version must have been published before this Action will update to it. A version that fixes a known vulnerability (checked via OSV.dev) always bypasses this. Set to 0 to disable.'
+    required: false
+    default: '3'
   create-pull-request:
     description: 'Whether to open a pull request when updates are found and every command passes'
     required: false

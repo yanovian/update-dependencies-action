@@ -81,4 +81,19 @@ export interface DependencyUpdatePlugin {
     mode: UpdateMode,
     ctx: UpdateContext,
   ): Promise<PluginUpdateResult>;
+  /**
+   * Re-pin one already-updated dependency to an exact version, used by the release-age gate
+   * (see src/core/security/release-age-gate.ts) to walk a too-fresh resolution back to the
+   * newest version old enough to satisfy the configured minimum age. Optional: a plugin that
+   * can't cleanly pin a single dependency to an arbitrary version (RubyGems, whose resolver has
+   * no such command without editing the Gemfile) omits this and the gate falls back to flagging
+   * the change instead of adjusting it. Returns false (not a throw) on failure, since a failed
+   * pin attempt is itself a normal, expected outcome the gate needs to react to.
+   */
+  pinVersion?(
+    location: ManifestLocation,
+    name: string,
+    version: string,
+    ctx: UpdateContext,
+  ): Promise<boolean>;
 }

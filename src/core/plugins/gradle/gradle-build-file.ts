@@ -11,6 +11,25 @@ import {
 // are left alone; the caller reports those as a manual-action note instead.
 const DEPENDENCY_NOTATION = /(['"])([\w.-]+):([\w.-]+):([\w.-]+)\1/g;
 
+/** Finds the version currently declared for one "group:artifact" dependency, used by
+ * `pinVersion` to build the `{from, to}` pair `rewriteBuildFile` requires, since the file on
+ * disk already holds this update's original (too-fresh) resolution, not the version from before
+ * this run started. Only recognizes the same quoted shorthand notation `rewriteBuildFile` does. */
+export function findDeclaredVersion(content: string, groupArtifact: string): string | null {
+  const [group, artifact] = groupArtifact.split(':');
+  if (!group || !artifact) {
+    return null;
+  }
+  const pattern = new RegExp(
+    `(['"])${escapeRegExp(group)}:${escapeRegExp(artifact)}:([\\w.-]+)\\1`,
+  );
+  return pattern.exec(content)?.[2] ?? null;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function rewriteBuildFile(
   original: string,
   candidates: ReadonlyMap<string, UpdateCandidate>,

@@ -9,6 +9,7 @@ export interface UpdateSummary {
   readonly mode: UpdateMode;
   readonly changes: readonly PackageChange[];
   readonly manualActionNeeded: readonly ManualNote[];
+  readonly ageGateNotes: readonly ManualNote[];
   readonly commands: readonly CommandResult[];
 }
 

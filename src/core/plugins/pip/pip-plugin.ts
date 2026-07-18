@@ -19,7 +19,41 @@ export function createPipPlugin(): DependencyUpdatePlugin {
     language: 'Python',
     detectManifests: detectRequirementsManifests,
     update: updateRequirements,
+    pinVersion: pinRequirementVersion,
   };
+}
+
+/** Rewrites just the one matching `name==version` pin, the same line-level rewrite
+ * `updateRequirements` already does, without re-running `pip install` first, since
+ * requirements.txt is the source of truth this plugin diffs against either way. */
+async function pinRequirementVersion(
+  location: ManifestLocation,
+  name: string,
+  version: string,
+  ctx: UpdateContext,
+): Promise<boolean> {
+  const manifestAbsPath = path.join(ctx.repoRoot, location.manifestPath);
+  const original = await readFile(manifestAbsPath, 'utf8');
+  const normalizedTarget = normalizePipName(name);
+
+  let matched = false;
+  const rewritten = original
+    .split('\n')
+    .map((line) => {
+      const pin = parsePinnedLine(line);
+      if (!pin || normalizePipName(pin.name) !== normalizedTarget) {
+        return line;
+      }
+      matched = true;
+      return line.replace(/==\s*[^\s#;]+/, `==${version}`);
+    })
+    .join('\n');
+
+  if (!matched) {
+    return false;
+  }
+  await writeFile(manifestAbsPath, rewritten, 'utf8');
+  return true;
 }
 
 async function updateRequirements(

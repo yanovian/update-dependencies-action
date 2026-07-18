@@ -18,7 +18,28 @@ export function createNuGetPlugin(): DependencyUpdatePlugin {
     language: 'C#/.NET',
     detectManifests: detectNuGetManifests,
     update: updateNuGet,
+    pinVersion: pinNuGetVersion,
   };
+}
+
+/** Same `dotnet add package` call `applyPackageUpdate` already makes, parameterized to an exact
+ * version instead of the latest one. */
+async function pinNuGetVersion(
+  location: ManifestLocation,
+  name: string,
+  version: string,
+  ctx: UpdateContext,
+): Promise<boolean> {
+  const dir = path.join(ctx.repoRoot, location.directory);
+  const projectFile = path.basename(location.manifestPath);
+  const result = await runProcess(
+    `dotnet add "${projectFile}" package ${name} --version ${version}`,
+    {
+      cwd: dir,
+      allowFailure: true,
+    },
+  );
+  return result.exitCode === 0;
 }
 
 async function updateNuGet(

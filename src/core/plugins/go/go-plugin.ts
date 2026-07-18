@@ -18,7 +18,25 @@ export function createGoPlugin(): DependencyUpdatePlugin {
     language: 'Go',
     detectManifests: detectGoManifests,
     update: updateGoModule,
+    pinVersion: pinGoVersion,
   };
+}
+
+/** `go get module@version` is Go's own documented way to pin one module to an exact version;
+ * `go mod tidy` afterward keeps go.sum consistent, same as `updateGoModule` already does. */
+async function pinGoVersion(
+  location: ManifestLocation,
+  name: string,
+  version: string,
+  ctx: UpdateContext,
+): Promise<boolean> {
+  const dir = path.join(ctx.repoRoot, location.directory);
+  const getResult = await runProcess(`go get ${name}@${version}`, { cwd: dir, allowFailure: true });
+  if (getResult.exitCode !== 0) {
+    return false;
+  }
+  const tidyResult = await runProcess('go mod tidy', { cwd: dir, allowFailure: true });
+  return tidyResult.exitCode === 0;
 }
 
 /**
