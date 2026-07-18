@@ -4,8 +4,6 @@
 
 **Updates your dependencies and opens a pull request, gated on your checks passing when you give it any to run.**
 
-> 🛒 [Check out on the Marketplace](https://github.com/marketplace/actions/update-dependencies) · [View source on GitHub](https://github.com/yanovian/update-dependencies-action)
->
 > [Configuration →](_docs/configuration.md) · [Supported package managers →](_docs/supported-package-managers.md) · [FAQ →](_docs/faq-and-limitations.md)
 
 - **Scans every package manager in your repo, in one run.** npm, Yarn, pnpm, pip, Cargo, Go,
