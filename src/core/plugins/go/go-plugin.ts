@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { runProcess } from '../../commands/run-process.js';
+import { runPinCommand, runProcess } from '../../commands/run-process.js';
 import { diffVersions } from '../../update/diff-versions.js';
 import type {
   DependencyUpdatePlugin,
   ManifestLocation,
+  PinTarget,
   PluginUpdateResult,
   UpdateContext,
   UpdateMode,
@@ -18,7 +19,23 @@ export function createGoPlugin(): DependencyUpdatePlugin {
     language: 'Go',
     detectManifests: detectGoManifests,
     update: updateGoModule,
+    pinVersion: pinGoVersion,
   };
+}
+
+/** `go get module@version` is Go's own documented way to pin one module to an exact version;
+ * `go mod tidy` afterward keeps go.sum consistent, same as `updateGoModule` already does. Skips
+ * the tidy step (via `&&`'s short-circuit) when the pin itself already failed. */
+async function pinGoVersion(
+  location: ManifestLocation,
+  target: PinTarget,
+  ctx: UpdateContext,
+): Promise<boolean> {
+  const dir = path.join(ctx.repoRoot, location.directory);
+  return (
+    (await runPinCommand(`go get ${target.name}@${target.version}`, dir)) &&
+    (await runPinCommand('go mod tidy', dir))
+  );
 }
 
 /**

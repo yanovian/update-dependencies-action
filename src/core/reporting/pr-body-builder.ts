@@ -8,6 +8,8 @@ export interface PrBodyOptions {
   readonly mode: UpdateMode;
   readonly changes: readonly PackageChange[];
   readonly manualActionNeeded: readonly ManualNote[];
+  readonly ageGateNotes: readonly ManualNote[];
+  readonly minReleaseAgeDays: number;
   readonly commandResults: readonly CommandResult[];
   readonly runDate: string;
   readonly stalePullRequests: readonly StalePullRequest[];
@@ -25,8 +27,9 @@ export function buildPullRequestTitle(
 
 export function buildPullRequestBody(options: PrBodyOptions): string {
   const sections = [
-    buildRunDateNote(options.runDate),
+    buildRunDateNote(options.runDate, options.minReleaseAgeDays),
     buildChangesTable(options.changes),
+    buildAgeGateSection(options.ageGateNotes),
     buildManualNotesSection(options.manualActionNeeded),
     buildCommandsSection(options.commandResults),
     buildStalePullRequestsSection(options.stalePullRequests),
@@ -37,8 +40,25 @@ export function buildPullRequestBody(options: PrBodyOptions): string {
   return sections.join('\n\n');
 }
 
-function buildRunDateNote(runDate: string): string {
-  return `**Run date:** ${runDate} (UTC). The versions below are what was latest as of this date.`;
+function buildRunDateNote(runDate: string, minReleaseAgeDays: number): string {
+  const policyNote =
+    minReleaseAgeDays > 0
+      ? ` Versions younger than ${minReleaseAgeDays} day(s) are held back unless they fix a known vulnerability.`
+      : '';
+  return (
+    `**Run date:** ${runDate} (UTC). The versions below are what was latest as of this date.` +
+    policyNote
+  );
+}
+
+function buildAgeGateSection(notes: readonly ManualNote[]): string {
+  if (notes.length === 0) {
+    return '';
+  }
+  const items = notes.map(
+    (note) => `- **${note.path}**${note.name ? ` (${note.name})` : ''}: ${note.reason}`,
+  );
+  return ['## Release-age policy', '', ...items].join('\n');
 }
 
 function buildChangesTable(changes: readonly PackageChange[]): string {

@@ -1,10 +1,11 @@
 import path from 'node:path';
-import { runProcess } from '../../commands/run-process.js';
+import { runPinCommand, runProcess } from '../../commands/run-process.js';
 import { isMajorBump } from '../../update/diff-versions.js';
 import type {
   DependencyUpdatePlugin,
   ManifestLocation,
   PackageChange,
+  PinTarget,
   PluginUpdateResult,
   UpdateContext,
   UpdateMode,
@@ -18,7 +19,23 @@ export function createNuGetPlugin(): DependencyUpdatePlugin {
     language: 'C#/.NET',
     detectManifests: detectNuGetManifests,
     update: updateNuGet,
+    pinVersion: pinNuGetVersion,
   };
+}
+
+/** Same `dotnet add package` call `applyPackageUpdate` already makes, parameterized to an exact
+ * version instead of the latest one. */
+function pinNuGetVersion(
+  location: ManifestLocation,
+  target: PinTarget,
+  ctx: UpdateContext,
+): Promise<boolean> {
+  const dir = path.join(ctx.repoRoot, location.directory);
+  const projectFile = path.basename(location.manifestPath);
+  return runPinCommand(
+    `dotnet add "${projectFile}" package ${target.name} --version ${target.version}`,
+    dir,
+  );
 }
 
 async function updateNuGet(

@@ -30,6 +30,26 @@ Some things this Action finds are deliberately left alone rather than guessed at
 These are listed in the pull request body so you know to look at them yourself, instead of being
 silently skipped.
 
+## What does the "Release-age policy" section in the pull request mean?
+
+That section only appears when `min-release-age-days` (default `3`) actually changed something
+about this run, see [release-age policy](configuration.md#release-age-policy) in the
+configuration docs for the full behavior. Each line is one of:
+
+- **Capped to an older version.** The newest resolved version was younger than the policy allows,
+  so this Action pinned to the newest version old enough instead. The change still shows up
+  normally in the changes table, just at the older version.
+- **No update applied.** Every version newer than what's currently installed is too young, so
+  nothing was changed for that package this run. It'll show up again once a version clears the
+  policy.
+- **Left as-is, flagged.** RubyGems has no way to pin a single gem to an exact version without
+  editing the Gemfile, so a too-fresh Bundler update is left in place instead of adjusted. Give it
+  extra scrutiny before merging.
+- **Unverified.** A registry or [OSV.dev](https://osv.dev) lookup didn't come back in time, so the
+  update was let through without being checked. This fails open deliberately, see
+  [release-age policy](configuration.md#release-age-policy), rather than a rate-limited registry
+  making the whole run unreliable.
+
 ## check-commands or your own CI, which should I use?
 
 Two ways to make sure an update is safe before it reaches you.

@@ -15,6 +15,11 @@
   for which one we recommend.
 - **Non-breaking by default, breaking on your own schedule.** Every change in the pull request is
   labeled breaking or non-breaking based on the actual version jump, not just the mode you ran.
+- **Holds back versions that were just published.** `min-release-age-days` (default 3) waits out
+  a version's first few days before updating to it, the same tradeoff Dependabot's own minimum
+  release age makes, so a compromised release has a window to get caught before it reaches you. A
+  version that fixes a known vulnerability always bypasses this. See
+  [release-age policy](_docs/configuration.md#release-age-policy).
 
 ## Usage
 

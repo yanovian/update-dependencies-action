@@ -1,11 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { runProcess } from '../../commands/run-process.js';
+import { runPinCommand, runProcess } from '../../commands/run-process.js';
 import { diffVersions } from '../../update/diff-versions.js';
 import { readFileIfPresent } from '../../util/read-file-if-present.js';
 import type {
   DependencyUpdatePlugin,
   ManifestLocation,
+  PinTarget,
   PluginUpdateResult,
   UpdateContext,
   UpdateMode,
@@ -25,7 +26,19 @@ export function createCargoPlugin(): DependencyUpdatePlugin {
     language: 'Rust',
     detectManifests: detectCargoManifests,
     update: updateCargo,
+    pinVersion: pinCargoVersion,
   };
+}
+
+/** `--precise` is cargo's own documented flag for pinning one crate to an exact version while
+ * still letting it resolve the rest of the dependency graph normally. */
+function pinCargoVersion(
+  location: ManifestLocation,
+  target: PinTarget,
+  ctx: UpdateContext,
+): Promise<boolean> {
+  const dir = path.join(ctx.repoRoot, location.directory);
+  return runPinCommand(`cargo update -p ${target.name} --precise ${target.version}`, dir);
 }
 
 async function updateCargo(

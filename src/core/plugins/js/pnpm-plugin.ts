@@ -1,6 +1,6 @@
 import { MANIFEST_FILENAMES } from '../../discovery/manifest-patterns.js';
 import type { DependencyUpdatePlugin } from '../../types/ecosystem-plugin.js';
-import { detectJsManifests, runJsUpdate } from './js-manifest.js';
+import { detectJsManifests, pinJsVersion, runJsUpdate } from './js-manifest.js';
 import { resolvePnpmLockVersions } from './pnpm-lockfile.js';
 
 const NON_BREAKING_COMMAND = 'pnpm update';
@@ -22,5 +22,7 @@ export function createPnpmPlugin(): DependencyUpdatePlugin {
         command: mode === 'breaking' ? BREAKING_COMMAND : NON_BREAKING_COMMAND,
         resolveVersions: resolvePnpmLockVersions,
       }),
+    pinVersion: (location, target, ctx) =>
+      pinJsVersion((pkg) => `pnpm add ${pkg}`, location, target, ctx),
   };
 }

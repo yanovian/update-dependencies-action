@@ -31,4 +31,27 @@ describe('readActionInputs', () => {
     );
     expect(readActionInputs().branchName).toBe('custom-prefix');
   });
+
+  it('defaults min-release-age-days to 3', () => {
+    expect(readActionInputs().minReleaseAgeDays).toBe(3);
+  });
+
+  it('parses min-release-age-days when set, including 0 to disable it', () => {
+    getInputMock.mockImplementation((name: string) => (name === 'min-release-age-days' ? '0' : ''));
+    expect(readActionInputs().minReleaseAgeDays).toBe(0);
+  });
+
+  it('rejects a negative min-release-age-days', () => {
+    getInputMock.mockImplementation((name: string) =>
+      name === 'min-release-age-days' ? '-1' : '',
+    );
+    expect(() => readActionInputs()).toThrow('min-release-age-days');
+  });
+
+  it('rejects a non-numeric min-release-age-days', () => {
+    getInputMock.mockImplementation((name: string) =>
+      name === 'min-release-age-days' ? 'soon' : '',
+    );
+    expect(() => readActionInputs()).toThrow('min-release-age-days');
+  });
 });

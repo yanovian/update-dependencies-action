@@ -72,6 +72,16 @@ export interface UpdateContext {
   readonly logger: Logger;
 }
 
+/** What `pinVersion` should change one dependency to, and what it's currently declared at.
+ * Carrying `fromVersion` lets a plugin whose rewriter needs to match the current declaration
+ * (e.g. Gradle's plain build-file notation) target it directly, instead of re-deriving it by
+ * re-reading and re-parsing the file its own `update()` just wrote. */
+export interface PinTarget {
+  readonly name: string;
+  readonly fromVersion: string;
+  readonly version: string;
+}
+
 export interface DependencyUpdatePlugin {
   readonly id: EcosystemId;
   readonly language: string;
@@ -81,4 +91,14 @@ export interface DependencyUpdatePlugin {
     mode: UpdateMode,
     ctx: UpdateContext,
   ): Promise<PluginUpdateResult>;
+  /**
+   * Re-pin one already-updated dependency to an exact version, used by the release-age gate
+   * (see src/core/security/release-age-gate.ts) to walk a too-fresh resolution back to the
+   * newest version old enough to satisfy the configured minimum age. Optional: a plugin that
+   * can't cleanly pin a single dependency to an arbitrary version (RubyGems, whose resolver has
+   * no such command without editing the Gemfile) omits this and the gate falls back to flagging
+   * the change instead of adjusting it. Returns false (not a throw) on failure, since a failed
+   * pin attempt is itself a normal, expected outcome the gate needs to react to.
+   */
+  pinVersion?(location: ManifestLocation, target: PinTarget, ctx: UpdateContext): Promise<boolean>;
 }

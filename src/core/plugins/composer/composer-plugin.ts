@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { runProcess } from '../../commands/run-process.js';
+import { runPinCommand, runProcess } from '../../commands/run-process.js';
 import { diffVersions } from '../../update/diff-versions.js';
 import type {
   DependencyUpdatePlugin,
   ManifestLocation,
+  PinTarget,
   PluginUpdateResult,
   UpdateContext,
   UpdateMode,
@@ -19,7 +20,22 @@ export function createComposerPlugin(): DependencyUpdatePlugin {
     language: 'PHP',
     detectManifests: detectComposerManifests,
     update: updateComposer,
+    pinVersion: pinComposerVersion,
   };
+}
+
+/** Same call breaking mode's `requireLatestVersions` already makes, parameterized to an exact
+ * version instead of the latest one. */
+function pinComposerVersion(
+  location: ManifestLocation,
+  target: PinTarget,
+  ctx: UpdateContext,
+): Promise<boolean> {
+  const dir = path.join(ctx.repoRoot, location.directory);
+  return runPinCommand(
+    `composer require ${target.name}:${target.version} --with-all-dependencies`,
+    dir,
+  );
 }
 
 async function updateComposer(

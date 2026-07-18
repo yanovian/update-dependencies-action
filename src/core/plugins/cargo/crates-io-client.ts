@@ -1,3 +1,6 @@
+import { fetchJsonWithRetry } from '../../security/http-retry.js';
+import { collectVersionDates } from '../../security/version-date-map.js';
+
 const USER_AGENT =
   'update-dependencies-action (https://github.com/yanovian/update-dependencies-action)';
 
@@ -16,4 +19,25 @@ export async function fetchLatestCrateVersion(name: string): Promise<string | nu
   }
   const body = (await response.json()) as CratesIoResponse;
   return body.crate?.max_stable_version ?? null;
+}
+
+interface CratesIoVersionsResponse {
+  readonly versions?: { readonly num?: string; readonly created_at?: string }[];
+}
+
+/** One request returns every published version's creation date, used by the release-age gate to
+ * find the newest version old enough to satisfy the configured minimum age. */
+export async function fetchCrateVersionDates(name: string): Promise<Map<string, Date> | null> {
+  const response = await fetchJsonWithRetry<CratesIoVersionsResponse>(
+    `https://crates.io/api/v1/crates/${encodeURIComponent(name)}/versions`,
+    { headers: { 'User-Agent': USER_AGENT } },
+  );
+  if (!response) {
+    return null;
+  }
+  return collectVersionDates(
+    response.versions ?? [],
+    (version) => version.num,
+    (version) => version.created_at,
+  );
 }
