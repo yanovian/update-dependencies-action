@@ -142,3 +142,5 @@ available dev commands (`make install`, `make test`, `make lint`, `make verify`,
 ## Projects using it
 
 - [Tabby: Chrome extension](https://github.com/yanovian/chrome-ext-tabby)
+- [Why Am I Here?: Chrome extension](https://github.com/yanovian/chrome-ext-why-am-i-here)
+- [Breadcrumb: Chrome extension](https://github.com/yanovian/chrome-ext-breadcrumb)
