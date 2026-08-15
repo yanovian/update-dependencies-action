@@ -122,6 +122,60 @@ For `github-token`, there are two paths, explained in full in the
   [How to create one](_docs/faq-and-limitations.md#creating-the-pat).
 - **Simpler, not recommended**: the default `GITHUB_TOKEN`, paired with `check-commands`.
 
+## FAQ
+
+Quick answers to the questions that come up most before adopting this Action. Full FAQ:
+[`_docs/faq-and-limitations.md`](_docs/faq-and-limitations.md).
+
+<details>
+<summary>What if I don't trust this Action and don't want to pass it my personal access token?</summary>
+
+Set `create-pull-request: false` and leave `github-token` empty. This Action then only updates
+dependencies and writes the rendered pull request title and body to disk, no token, no network
+call with one. A later step in the same job, using an official action like
+`actions/github-script`, opens the pull request itself.
+[Full answer →](_docs/faq-and-limitations.md#can-i-avoid-giving-this-action-a-token-entirely)
+
+</details>
+
+<details>
+<summary>Why does it need write permissions?</summary>
+
+Pushing the update branch and opening the pull request need `contents: write` and
+`pull-requests: write` from something in your workflow, though not necessarily from this Action
+itself (see the token question above).
+[Full answer →](_docs/faq-and-limitations.md#why-does-it-need-write-permissions)
+
+</details>
+
+<details>
+<summary>Can I trigger this on <code>pull_request</code>?</summary>
+
+No. GitHub gives the default token read-only access on a `pull_request` run from a fork, so
+pushing a branch would fail. Use `schedule` or `workflow_dispatch` instead.
+[Full answer →](_docs/faq-and-limitations.md#can-i-trigger-this-on-pull_request)
+
+</details>
+
+<details>
+<summary>Does it open a new pull request every time it runs?</summary>
+
+Only when it finds updates, and only one per day: the branch is dated, so running it again the
+same day updates that same pull request instead of opening a duplicate.
+[Full answer →](_docs/faq-and-limitations.md#does-it-create-a-new-pull-request-every-time-it-runs)
+
+</details>
+
+<details>
+<summary><code>check-commands</code> or my own CI, which should I use?</summary>
+
+Your own CI, with a PAT for `github-token`, is recommended: it checks the update the same way it
+checks every other pull request, nothing duplicated. `check-commands` is simpler to set up but
+runs its own separate check.
+[Full answer →](_docs/faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use)
+
+</details>
+
 ## Docs
 
 - [Configuration](_docs/configuration.md): every workflow input, output, and config file field.
