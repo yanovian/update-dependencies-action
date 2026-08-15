@@ -32,6 +32,10 @@ describe('readActionInputs', () => {
     expect(readActionInputs().branchName).toBe('custom-prefix');
   });
 
+  it('allows github-token to be empty, for runs that never open a pull request', () => {
+    expect(readActionInputs().githubToken).toBe('');
+  });
+
   it('defaults min-release-age-days to 3', () => {
     expect(readActionInputs().minReleaseAgeDays).toBe(3);
   });

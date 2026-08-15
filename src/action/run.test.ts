@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   runCommands: vi.fn(),
   parseCommands: vi.fn(),
   writeSummaryToDisk: vi.fn(),
+  writePullRequestBodyToDisk: vi.fn(),
   setActionOutputs: vi.fn(),
   setFailed: vi.fn(),
   createBranch: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock('../core/commands/command-runner.js', () => ({
 }));
 vi.mock('../core/reporting/report-builder.js', () => ({
   writeSummaryToDisk: mocks.writeSummaryToDisk,
+  writePullRequestBodyToDisk: mocks.writePullRequestBodyToDisk,
 }));
 vi.mock('./outputs.js', () => ({ setActionOutputs: mocks.setActionOutputs }));
 vi.mock('@actions/core', () => ({
@@ -92,6 +94,7 @@ beforeEach(() => {
   mocks.listRepoFiles.mockResolvedValue([]);
   mocks.loadConfig.mockResolvedValue({ version: 1, ecosystems: {}, ignorePaths: [] });
   mocks.writeSummaryToDisk.mockResolvedValue('/repo/update-dependencies-summary.json');
+  mocks.writePullRequestBodyToDisk.mockResolvedValue('/repo/update-dependencies-pr-body.md');
   mocks.parseCommands.mockReturnValue(['npm test']);
   mocks.resolveBaseBranch.mockResolvedValue('main');
   mocks.findStalePullRequests.mockResolvedValue([]);
@@ -178,9 +181,59 @@ describe('run', () => {
     );
     expect(mocks.createOrUpdatePullRequest).toHaveBeenCalled();
     expect(mocks.setActionOutputs).toHaveBeenCalledWith(
-      expect.objectContaining({ updated: true, commandsPassed: true, pullRequestNumber: 42 }),
+      expect.objectContaining({
+        updated: true,
+        commandsPassed: true,
+        pullRequestNumber: 42,
+        pullRequestTitle: expect.any(String),
+        pullRequestBodyPath: '/repo/update-dependencies-pr-body.md',
+      }),
     );
     expect(mocks.setFailed).not.toHaveBeenCalled();
+  });
+
+  it('writes the pull request title and body without opening one when create-pull-request is false', async () => {
+    mocks.readActionInputs.mockReturnValue({
+      ...DEFAULT_INPUTS,
+      createPullRequest: false,
+      githubToken: '',
+    });
+    mocks.updateRepo.mockResolvedValue({
+      manifestsUpdated: [MANIFEST],
+      changes: [CHANGE],
+      manualActionNeeded: [],
+    });
+    mocks.runCommands.mockResolvedValue({ results: [], allSucceeded: true, failedCommand: null });
+
+    await run(logger);
+
+    expect(mocks.findStalePullRequests).not.toHaveBeenCalled();
+    expect(mocks.createOrUpdatePullRequest).not.toHaveBeenCalled();
+    expect(mocks.createBranch).not.toHaveBeenCalled();
+    expect(mocks.writePullRequestBodyToDisk).toHaveBeenCalled();
+    expect(mocks.setActionOutputs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updated: true,
+        pullRequestTitle: expect.any(String),
+        pullRequestBodyPath: '/repo/update-dependencies-pr-body.md',
+      }),
+    );
+    expect(mocks.setFailed).not.toHaveBeenCalled();
+  });
+
+  it('fails clearly when create-pull-request is true but github-token is empty', async () => {
+    mocks.readActionInputs.mockReturnValue({ ...DEFAULT_INPUTS, githubToken: '' });
+    mocks.updateRepo.mockResolvedValue({
+      manifestsUpdated: [MANIFEST],
+      changes: [CHANGE],
+      manualActionNeeded: [],
+    });
+    mocks.runCommands.mockResolvedValue({ results: [], allSucceeded: true, failedCommand: null });
+
+    await run(logger);
+
+    expect(mocks.createOrUpdatePullRequest).not.toHaveBeenCalled();
+    expect(mocks.setFailed).toHaveBeenCalledWith(expect.stringContaining('github-token'));
   });
 
   it('skips the release-age gate entirely when min-release-age-days is 0', async () => {

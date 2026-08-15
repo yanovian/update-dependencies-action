@@ -26,7 +26,9 @@ export function readActionInputs(): ActionInputs {
     branchName: core.getInput('branch-name') || `chore/update-deps/${updateStrategy}`,
     configPath: core.getInput('config-path') || '.github/update-dependencies.yml',
     workingDirectory: core.getInput('working-directory') || '.',
-    githubToken: core.getInput('github-token', { required: true }),
+    // Not required: a repo that never opens a pull request (create-pull-request: false) never
+    // needs to hand this Action a token at all, see faq-and-limitations.md.
+    githubToken: core.getInput('github-token'),
     minReleaseAgeDays: parseMinReleaseAgeDays(core.getInput('min-release-age-days')),
   };
 }

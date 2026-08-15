@@ -4,6 +4,7 @@ import type { CommandResult } from '../commands/command-runner.js';
 import type { ManualNote, PackageChange, UpdateMode } from '../types/ecosystem-plugin.js';
 
 const SUMMARY_FILENAME = 'update-dependencies-summary.json';
+const PULL_REQUEST_BODY_FILENAME = 'update-dependencies-pr-body.md';
 
 export interface UpdateSummary {
   readonly mode: UpdateMode;
@@ -24,4 +25,13 @@ export async function writeSummaryToDisk(
   const summaryPath = path.join(outputDir, SUMMARY_FILENAME);
   await writeFile(summaryPath, JSON.stringify(summary, null, 2), 'utf8');
   return summaryPath;
+}
+
+/** Lets a workflow open the pull request itself, with its own token, instead of handing one to
+ * this Action: the rendered body is written here even when create-pull-request is false. Same
+ * outside-the-checkout reasoning as writeSummaryToDisk. */
+export async function writePullRequestBodyToDisk(body: string, outputDir: string): Promise<string> {
+  const bodyPath = path.join(outputDir, PULL_REQUEST_BODY_FILENAME);
+  await writeFile(bodyPath, body, 'utf8');
+  return bodyPath;
 }

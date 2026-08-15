@@ -65,6 +65,8 @@ More examples, each in its own folder under [`examples/`](examples/):
   file
 - [`examples/with-branch-name/`](examples/with-branch-name/): a custom `branch-name` prefix
   instead of the default
+- [`examples/no-token-pull-request/`](examples/no-token-pull-request/): generating the update
+  without giving this Action any token, and opening the pull request in a separate, trusted step
 
 Don't trigger this Action itself on `pull_request`. See
 [why in the FAQ](_docs/faq-and-limitations.md#can-i-trigger-this-on-pull_request).

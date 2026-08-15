@@ -16,7 +16,7 @@ ecosystems and paths to skip.
 | `branch-name` | `chore/update-deps/<update-strategy>` | Prefix for the branch this Action commits to. The actual branch is `<branch-name>/<run-date>`, see [does it create a new pull request every time it runs](faq-and-limitations.md#does-it-create-a-new-pull-request-every-time-it-runs) in the FAQ. Example: [`examples/with-branch-name/`](../examples/with-branch-name/). |
 | `config-path` | `.github/update-dependencies.yml` | Path to the config file described below. Missing is fine, everything is scanned by default. |
 | `working-directory` | `.` | Directory to scan, relative to the repo root. Use this if the Action should only look at part of a larger repo. |
-| `github-token` | `${{ github.token }}` | Token used to push the branch and open the pull request. A PAT is recommended over the default, see [check-commands or your own CI](faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use) in the FAQ for why. |
+| `github-token` | `${{ github.token }}` | Token used to push the branch and open the pull request. Only needed when `create-pull-request` is `true`; leave it empty otherwise, see [posting the pull request without a token](faq-and-limitations.md#can-i-avoid-giving-this-action-a-token-entirely) in the FAQ. A PAT is recommended over the default, see [check-commands or your own CI](faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use) in the FAQ for why. |
 
 ## Outputs
 
@@ -25,6 +25,8 @@ ecosystems and paths to skip.
 | `updated` | `true` if any dependency was updated. |
 | `pull-request-number` | Number of the pull request that was created or updated, if any. |
 | `pull-request-url` | URL of the pull request that was created or updated, if any. |
+| `pull-request-title` | The title this Action would give the pull request, set whenever there are updates to report, whether or not `create-pull-request` actually opened one. |
+| `pull-request-body-path` | Path to the rendered pull request body (Markdown), written outside the repo checkout. Lets a later step open the pull request itself instead of giving this Action a token. |
 | `changes-summary-path` | Path to a JSON file with every change and manual-action note from this run. Written outside the repo checkout (the runner's temp directory), never committed. |
 | `commands-passed` | `true` if every command in `check-commands` exited successfully. |
 

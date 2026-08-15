@@ -15,7 +15,10 @@ import type { Logger } from '../core/logging/logger.js';
 import { createAllPlugins } from '../core/plugins/all-plugins.js';
 import { createPluginRegistry, type PluginRegistry } from '../core/plugins/registry.js';
 import { buildPullRequestBody, buildPullRequestTitle } from '../core/reporting/pr-body-builder.js';
-import { writeSummaryToDisk } from '../core/reporting/report-builder.js';
+import {
+  writePullRequestBodyToDisk,
+  writeSummaryToDisk,
+} from '../core/reporting/report-builder.js';
 import { applyReleaseAgeGate } from '../core/security/release-age-gate.js';
 import type { ManualNote, PackageChange } from '../core/types/ecosystem-plugin.js';
 import { updateRepo, type UpdateRepoResult } from '../core/update/update-repo.js';
@@ -147,59 +150,79 @@ async function verifyAndPublish(
     return;
   }
 
-  if (!inputs.createPullRequest) {
-    logger.info('create-pull-request is false; leaving the updated files in the working tree.');
-    setActionOutputs({ updated: true, changesSummaryPath: summaryPath, commandsPassed: true });
-    return;
-  }
-
-  const pr = await openPullRequest(ctx, updateResult, ageGateNotes, commandSummary.results);
-  setActionOutputs({
-    updated: true,
-    pullRequestNumber: pr.number,
-    pullRequestUrl: pr.url,
-    changesSummaryPath: summaryPath,
-    commandsPassed: true,
+  await publishPullRequest(ctx, updateResult, {
+    ageGateNotes,
+    commandResults: commandSummary.results,
+    summaryPath,
   });
 }
 
-/** The branch pushed to is dated (branchPrefix/YYYY-MM-DD), so running this again the same day
- * force-pushes and reuses the same pull request, same as before, but a run on a later date opens
- * a new one instead of silently rewriting yesterday's, which would otherwise make the pull
- * request history useless as a record of what happened when. */
-async function openPullRequest(
+interface PublishInput {
+  readonly ageGateNotes: readonly ManualNote[];
+  readonly commandResults: readonly CommandResult[];
+  readonly summaryPath: string;
+}
+
+/** Builds the pull request title and body once, whether or not this Action opens the pull
+ * request itself: a workflow that withholds the token (create-pull-request: false) can still
+ * open the pull request in a later step, using its own trusted action, with this same content. */
+async function publishPullRequest(
+  ctx: RunContext,
+  updateResult: UpdateRepoResult,
+  input: PublishInput,
+): Promise<void> {
+  const { inputs, logger } = ctx;
+  const { ageGateNotes, commandResults, summaryPath } = input;
+  const content = await buildPullRequestContent(ctx, updateResult, ageGateNotes, commandResults);
+  const bodyPath = await writePullRequestBodyToDisk(content.body, summaryOutputDir());
+  const baseOutputs = {
+    updated: true,
+    changesSummaryPath: summaryPath,
+    commandsPassed: true,
+    pullRequestTitle: content.title,
+    pullRequestBodyPath: bodyPath,
+  };
+
+  if (!inputs.createPullRequest) {
+    logger.info('create-pull-request is false; leaving the updated files in the working tree.');
+    setActionOutputs(baseOutputs);
+    return;
+  }
+  if (!inputs.githubToken) {
+    core.setFailed(
+      'create-pull-request is true but github-token is empty; provide a token, or set ' +
+        'create-pull-request to false and open the pull request yourself from pull-request-body-path.',
+    );
+    return;
+  }
+
+  const pr = await openPullRequest(ctx, updateResult, content);
+  setActionOutputs({ ...baseOutputs, pullRequestNumber: pr.number, pullRequestUrl: pr.url });
+}
+
+interface PullRequestContent {
+  readonly branchName: string;
+  readonly title: string;
+  readonly body: string;
+}
+
+/** The "stale pull requests" section needs a real, token-authenticated API call to look up other
+ * open pull requests, so it's simply left out when there is no token, rather than the whole body
+ * failing to generate. Everything else in the body is derived from this run's own data. */
+async function buildPullRequestContent(
   ctx: RunContext,
   updateResult: UpdateRepoResult,
   ageGateNotes: readonly ManualNote[],
   commandResults: readonly CommandResult[],
-): Promise<PullRequestResult> {
-  const { inputs, repoRoot } = ctx;
-  const baseBranch = await resolveBaseBranch(inputs.githubToken, inputs.baseBranch);
+): Promise<PullRequestContent> {
+  const { inputs } = ctx;
   const runDate = getUtcDateString();
   const branchName = `${inputs.branchName}/${runDate}`;
-  const git = createGitClient(repoRoot);
-  const changedDirectories = [
-    ...new Set(
-      updateResult.manifestsUpdated.flatMap((m) => [
-        m.directory,
-        m.lockfileDirectory ?? m.directory,
-      ]),
-    ),
-  ];
+  const stalePullRequests = inputs.githubToken
+    ? await findStalePullRequests(inputs.githubToken, inputs.branchName, branchName)
+    : [];
 
-  await git.createBranch(branchName);
-  await git.commit(changedDirectories, buildCommitMessage(updateResult.changes, inputs, runDate));
-  await git.push(branchName);
-
-  const stalePullRequests = await findStalePullRequests(
-    inputs.githubToken,
-    inputs.branchName,
-    branchName,
-  );
-
-  return createOrUpdatePullRequest({
-    githubToken: inputs.githubToken,
-    baseBranch,
+  return {
     branchName,
     title: buildPullRequestTitle(updateResult.changes, inputs.updateStrategy, runDate),
     body: buildPullRequestBody({
@@ -212,13 +235,39 @@ async function openPullRequest(
       runDate,
       stalePullRequests,
     }),
-  });
+  };
 }
 
-function buildCommitMessage(
-  changes: readonly PackageChange[],
-  inputs: ActionInputs,
-  runDate: string,
-): string {
-  return buildPullRequestTitle(changes, inputs.updateStrategy, runDate);
+/** Re-running this on the same day force-pushes the same dated branch and reuses the existing
+ * pull request instead of opening a new one; a run on a later date opens a new one, so dated
+ * branches keep a record of what changed and when. */
+async function openPullRequest(
+  ctx: RunContext,
+  updateResult: UpdateRepoResult,
+  content: PullRequestContent,
+): Promise<PullRequestResult> {
+  const { inputs, repoRoot } = ctx;
+  const { branchName, title, body } = content;
+  const baseBranch = await resolveBaseBranch(inputs.githubToken, inputs.baseBranch);
+  const git = createGitClient(repoRoot);
+  const changedDirectories = [
+    ...new Set(
+      updateResult.manifestsUpdated.flatMap((m) => [
+        m.directory,
+        m.lockfileDirectory ?? m.directory,
+      ]),
+    ),
+  ];
+
+  await git.createBranch(branchName);
+  await git.commit(changedDirectories, title);
+  await git.push(branchName);
+
+  return createOrUpdatePullRequest({
+    githubToken: inputs.githubToken,
+    baseBranch,
+    branchName,
+    title,
+    body,
+  });
 }

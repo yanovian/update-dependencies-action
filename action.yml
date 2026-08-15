@@ -39,7 +39,7 @@ inputs:
     required: false
     default: '.'
   github-token:
-    description: 'Token used to push the update branch and open the pull request'
+    description: 'Token used to push the update branch and open the pull request. Only needed when create-pull-request is true; leave empty otherwise, see pull-request-title and pull-request-body-path.'
     required: false
     default: ${{ github.token }}
 
@@ -50,6 +50,10 @@ outputs:
     description: 'Number of the pull request that was created or updated, if any'
   pull-request-url:
     description: 'URL of the pull request that was created or updated, if any'
+  pull-request-title:
+    description: 'The title this Action would use for the pull request, set whenever there are updates to report, whether or not create-pull-request opened one'
+  pull-request-body-path:
+    description: 'Path to the rendered pull request body (Markdown) written to disk, so a later step can open the pull request itself instead of giving this Action a token'
   changes-summary-path:
     description: 'Path to the full JSON summary of changes written to disk'
   commands-passed:

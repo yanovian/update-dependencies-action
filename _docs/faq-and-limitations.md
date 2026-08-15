@@ -3,9 +3,25 @@
 ## Why does it need write permissions?
 
 Pushing the update branch and opening the pull request both need `contents: write` and
-`pull-requests: write`. There is no way around this. See
-[permissions and tokens](../README.md#permissions-and-tokens) in the README for the exact
-workflow permissions block.
+`pull-requests: write` from *something* in your workflow. This Action itself doesn't have to be
+the one holding that token, see [can I avoid giving this Action a token entirely](#can-i-avoid-giving-this-action-a-token-entirely)
+below. If it is, see [permissions and tokens](../README.md#permissions-and-tokens) in the README
+for the exact workflow permissions block.
+
+## Can I avoid giving this Action a token entirely?
+
+Yes. Set `create-pull-request: false` and leave `github-token` empty. This Action then only
+updates dependencies, leaves the changed files in the working tree uncommitted, and writes the
+rendered pull request title and body to disk (`pull-request-title` and `pull-request-body-path`
+outputs) without ever touching the network with a token. A later step in the same job, using an
+official action like `actions/github-script`, commits, pushes, and opens the pull request using
+those outputs. See [`examples/no-token-pull-request/`](../examples/no-token-pull-request/).
+
+This is for supply-chain-sensitive setups where you'd rather not hand any token to third-party
+code: a compromised or malicious version of this Action could exfiltrate whatever token it
+receives, so the safest amount to give it is none. For this to actually isolate token access, the
+update step itself must not have a `GITHUB_TOKEN` environment variable available to it either,
+only the step that opens the pull request should.
 
 ## Can I trigger this on `pull_request`?
 
