@@ -12,6 +12,7 @@ import type {
   PluginUpdateResult,
   UpdateContext,
 } from '../../types/ecosystem-plugin.js';
+import { resolvePnpmLockContext } from './pnpm-workspace.js';
 
 /** Shared by npm, yarn, and pnpm's `pinVersion`: each manager's own install command, given an
  * explicit `name@version`, re-resolves and re-writes the lockfile just like their regular update
@@ -39,19 +40,40 @@ export function toManifestLocation(
   return { ecosystem, language, manifestPath, directory: path.dirname(manifestPath) };
 }
 
-/** npm is the fallback for any package.json that isn't claimed by Yarn or pnpm's own lockfile,
- * including the no-lockfile-yet case, so exactly one plugin ever claims a given directory. */
+/** npm is the fallback for any package.json that isn't claimed by Yarn or pnpm (its own lockfile,
+ * or membership in a pnpm workspace), including the no-lockfile-yet case, so exactly one plugin
+ * ever claims a given directory. */
 export function detectNpmManifests(repoFiles: readonly string[]): ManifestLocation[] {
   const repoFileSet = new Set(repoFiles);
   return repoFiles
     .filter((filePath) => path.basename(filePath) === 'package.json')
     .filter((manifestPath) => {
-      const dir = path.dirname(manifestPath);
-      const hasYarnLock = repoFileSet.has(path.join(dir, 'yarn.lock'));
-      const hasPnpmLock = repoFileSet.has(path.join(dir, 'pnpm-lock.yaml'));
-      return !hasYarnLock && !hasPnpmLock;
+      const hasYarnLock = repoFileSet.has(path.join(path.dirname(manifestPath), 'yarn.lock'));
+      const isPnpmProject = resolvePnpmLockContext(repoFiles, manifestPath) !== null;
+      return !hasYarnLock && !isPnpmProject;
     })
     .map((manifestPath) => toManifestLocation(manifestPath, 'npm', 'JavaScript/TypeScript'));
+}
+
+/** Unlike Yarn, a pnpm project's lockfile doesn't have to sit next to its package.json: a
+ * workspace member shares the lockfile at its workspace root (see pnpm-workspace.ts). */
+export function detectPnpmManifests(repoFiles: readonly string[]): ManifestLocation[] {
+  return repoFiles
+    .filter((filePath) => path.basename(filePath) === 'package.json')
+    .flatMap((manifestPath) => {
+      const context = resolvePnpmLockContext(repoFiles, manifestPath);
+      if (!context) {
+        return [];
+      }
+      const location = toManifestLocation(manifestPath, 'pnpm', 'JavaScript/TypeScript');
+      const sharesAWorkspaceLockfile = context.lockfileDir !== location.directory;
+      return [
+        {
+          ...location,
+          ...(sharesAWorkspaceLockfile ? { lockfileDirectory: context.lockfileDir } : {}),
+        },
+      ];
+    });
 }
 
 export function detectJsManifests(
@@ -89,12 +111,15 @@ export interface JsUpdateOptions {
 
 /** Shared by every JS package manager plugin: snapshot resolved versions from the lockfile,
  * run that manager's own real update command so its own resolver writes the lockfile, snapshot
- * again, and diff. Never hand-edits a lockfile. */
+ * again, and diff. Never hand-edits a lockfile. The command always runs from the manifest's own
+ * directory (so pnpm scopes a workspace member's update to just that package), but the lockfile
+ * itself is read from `location.lockfileDirectory` when set, i.e. a pnpm workspace root. */
 export async function runJsUpdate(options: JsUpdateOptions): Promise<PluginUpdateResult> {
   const { ecosystem, location, ctx, lockfileName, command, resolveVersions } = options;
   const dir = path.join(ctx.repoRoot, location.directory);
   const manifestAbsPath = path.join(ctx.repoRoot, location.manifestPath);
-  const lockfileAbsPath = path.join(dir, lockfileName);
+  const lockfileDir = path.join(ctx.repoRoot, location.lockfileDirectory ?? location.directory);
+  const lockfileAbsPath = path.join(lockfileDir, lockfileName);
 
   const declared = await readDeclaredDependencies(manifestAbsPath);
   const readOptions = { lockfileAbsPath, declared, resolveVersions, logger: ctx.logger };

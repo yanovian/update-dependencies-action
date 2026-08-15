@@ -23,4 +23,26 @@ dependencies:
     const result = resolvePnpmLockVersions(lockfile, new Map([['left-pad', '^1.0.0']]));
     expect(result).toEqual(new Map([['left-pad', '1.3.0']]));
   });
+
+  it('resolves a workspace member by its importer key instead of the root', () => {
+    const lockfile = `
+importers:
+  .:
+    dependencies:
+      left-pad:
+        specifier: ^1.0.0
+        version: 1.0.0
+  packages/foo:
+    dependencies:
+      left-pad:
+        specifier: ^1.3.0
+        version: 1.3.0
+`;
+    const result = resolvePnpmLockVersions(
+      lockfile,
+      new Map([['left-pad', '^1.3.0']]),
+      'packages/foo',
+    );
+    expect(result).toEqual(new Map([['left-pad', '1.3.0']]));
+  });
 });

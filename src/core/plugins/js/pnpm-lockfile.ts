@@ -34,17 +34,19 @@ function resolvedVersionOf(value: PnpmDependencyValue): string {
 
 /**
  * Supports every pnpm-lock.yaml layout seen in practice: the current "importers" format
- * (pnpm 6+, root package keyed by "."), where a dependency value can be either a combined
- * {specifier, version} object (v9+) or a plain resolved-version string (v6 to v8); and the
- * pre-workspace format (pnpm 5 and earlier) with no importers wrapper, where dependencies sit
- * directly at the document root. Only the declared direct dependencies are returned.
+ * (pnpm 6+, one entry per workspace package, keyed by its path relative to the workspace root,
+ * "." for the root itself), where a dependency value can be either a combined {specifier,
+ * version} object (v9+) or a plain resolved-version string (v6 to v8); and the pre-workspace
+ * format (pnpm 5 and earlier) with no importers wrapper, where dependencies sit directly at the
+ * document root. Only the declared direct dependencies are returned.
  */
 export function resolvePnpmLockVersions(
   lockfileContents: string,
   declared: ReadonlyMap<string, string>,
+  importerKey = '.',
 ): Map<string, string> {
   const lockfile = parseYaml(lockfileContents) as PnpmLockShape;
-  const container = lockfile.importers?.['.'] ?? lockfile;
+  const container = lockfile.importers?.[importerKey] ?? lockfile;
   const merged: Record<string, PnpmDependencyValue> = {
     ...container.dependencies,
     ...container.devDependencies,

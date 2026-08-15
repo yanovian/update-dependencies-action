@@ -178,7 +178,14 @@ async function openPullRequest(
   const runDate = getUtcDateString();
   const branchName = `${inputs.branchName}/${runDate}`;
   const git = createGitClient(repoRoot);
-  const changedDirectories = [...new Set(updateResult.manifestsUpdated.map((m) => m.directory))];
+  const changedDirectories = [
+    ...new Set(
+      updateResult.manifestsUpdated.flatMap((m) => [
+        m.directory,
+        m.lockfileDirectory ?? m.directory,
+      ]),
+    ),
+  ];
 
   await git.createBranch(branchName);
   await git.commit(changedDirectories, buildCommitMessage(updateResult.changes, inputs, runDate));

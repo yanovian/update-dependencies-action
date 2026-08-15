@@ -24,6 +24,11 @@ export interface ManifestLocation {
   readonly language: string;
   readonly manifestPath: string;
   readonly directory: string;
+  /** Directory (relative to the repo root) the lockfile actually lives in, when it's not
+   * `directory` (a pnpm workspace member shares its workspace root's lockfile). Defaults to
+   * `directory`; only set this when the two genuinely differ, so the committed directories stay
+   * accurate. */
+  readonly lockfileDirectory?: string;
 }
 
 export interface PackageChange {

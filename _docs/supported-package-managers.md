@@ -21,6 +21,11 @@ runs from the directory holding `settings.gradle(.kts)`, the same way you would 
 | Composer | PHP | composer.json + composer.lock | `composer update --with-all-dependencies` | looks up each package's latest version, then `composer require pkg:^latest` |
 | NuGet | C#/.NET | *.csproj | `dotnet list package --outdated`, then `dotnet add package <id> --version <v>` for each package within the same major | same, any major |
 
+**pnpm workspaces.** A workspace member doesn't need its own `pnpm-lock.yaml`. This Action detects
+`pnpm-workspace.yaml` and resolves each member against the workspace root's lockfile instead,
+while still running the update command from the member's own directory so pnpm scopes it to just
+that package.
+
 Where a package manager has its own real update command, this Action always uses it. It never
 hand-edits a lockfile. The only files it rewrites directly are plain manifest files with no
 command of their own for this (requirements.txt, Cargo.toml for a major bump, a Gradle version
