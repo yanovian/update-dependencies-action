@@ -15,7 +15,7 @@ vi.mock('../../commands/run-process.js', () => ({
   },
 }));
 
-const { detectJsManifests, detectNpmManifests, pinJsVersion, runJsUpdate } =
+const { detectJsManifests, detectNpmManifests, detectPnpmManifests, pinJsVersion, runJsUpdate } =
   await import('./js-manifest.js');
 
 const logger: Logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), group: (_name, fn) => fn() };
@@ -53,6 +53,54 @@ describe('detectNpmManifests', () => {
   it('does not claim a directory that has yarn.lock or pnpm-lock.yaml', () => {
     expect(detectNpmManifests(['app/package.json', 'app/yarn.lock'])).toEqual([]);
     expect(detectNpmManifests(['app/package.json', 'app/pnpm-lock.yaml'])).toEqual([]);
+  });
+
+  it('does not claim a pnpm workspace member, even with no lockfile of its own', () => {
+    const repoFiles = ['pnpm-workspace.yaml', 'pnpm-lock.yaml', 'packages/foo/package.json'];
+    expect(detectNpmManifests(repoFiles)).toEqual([]);
+  });
+});
+
+describe('detectPnpmManifests', () => {
+  it('claims a standalone project with its own lockfile', () => {
+    const result = detectPnpmManifests(['app/package.json', 'app/pnpm-lock.yaml']);
+    expect(result).toEqual([
+      {
+        ecosystem: 'pnpm',
+        language: 'JavaScript/TypeScript',
+        manifestPath: 'app/package.json',
+        directory: 'app',
+      },
+    ]);
+  });
+
+  it('claims a workspace member with no lockfile of its own, pointing at the workspace root', () => {
+    const repoFiles = [
+      'pnpm-workspace.yaml',
+      'pnpm-lock.yaml',
+      'package.json',
+      'packages/foo/package.json',
+    ];
+    const result = detectPnpmManifests(repoFiles);
+
+    expect(result).toContainEqual({
+      ecosystem: 'pnpm',
+      language: 'JavaScript/TypeScript',
+      manifestPath: 'packages/foo/package.json',
+      directory: 'packages/foo',
+      lockfileDirectory: '.',
+    });
+    // The workspace root itself already has its lockfile alongside it, so it needs no override.
+    expect(result).toContainEqual({
+      ecosystem: 'pnpm',
+      language: 'JavaScript/TypeScript',
+      manifestPath: 'package.json',
+      directory: '.',
+    });
+  });
+
+  it('does not claim a package.json outside any pnpm workspace or lockfile', () => {
+    expect(detectPnpmManifests(['app/package.json'])).toEqual([]);
   });
 });
 
@@ -233,6 +281,29 @@ describe('runJsUpdate', () => {
         indirect: true,
       },
     ]);
+  });
+
+  it('reads the lockfile from lockfileDirectory when set, not the manifest directory', async () => {
+    mockPackageJson();
+    const resolveVersions = vi.fn().mockReturnValue(new Map([['left-pad', '1.0.0']]));
+    const workspaceMember = { ...location, lockfileDirectory: '.' };
+
+    await runJsUpdate({
+      ecosystem: 'pnpm',
+      location: workspaceMember,
+      ctx: { repoRoot: '/repo', logger },
+      lockfileName: 'pnpm-lock.yaml',
+      command: 'pnpm update',
+      resolveVersions,
+    });
+
+    const lockfileReads = readFileMock.mock.calls
+      .map((call) => call[0] as string)
+      .filter((filePath) => filePath.endsWith('pnpm-lock.yaml'));
+    expect(lockfileReads).toEqual(['/repo/pnpm-lock.yaml', '/repo/pnpm-lock.yaml']);
+    // The command itself still runs from the package's own directory, so pnpm scopes the update
+    // to just that workspace member.
+    expect(runProcessMock).toHaveBeenCalledWith('pnpm update', { cwd: '/repo/app' });
   });
 });
 
