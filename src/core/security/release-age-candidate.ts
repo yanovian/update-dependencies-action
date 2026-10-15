@@ -16,8 +16,9 @@ export async function pickSafeCompliantVersion(
   change: PackageChange,
   versionDates: ReadonlyMap<string, Date>,
   thresholdDate: Date,
+  initiallyExcluded: ReadonlySet<string> = new Set(),
 ): Promise<{ version: string; date: Date } | null> {
-  const excluded = new Set<string>();
+  const excluded = new Set(initiallyExcluded);
   for (let attempt = 0; attempt < MAX_CANDIDATE_ATTEMPTS; attempt++) {
     const candidate = pickCompliantVersion(change, versionDates, thresholdDate, excluded);
     if (!candidate) {

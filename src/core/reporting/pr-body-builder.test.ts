@@ -19,6 +19,7 @@ const STALE_PR = {
 const BASE_OPTIONS = {
   manualActionNeeded: [],
   ageGateNotes: [],
+  stabilityNotes: [],
   minReleaseAgeDays: 3,
   commandResults: [],
   runDate: '2026-07-16',
@@ -103,6 +104,19 @@ describe('buildPullRequestBody', () => {
     });
     expect(body).toContain('## Release-age policy');
     expect(body).toContain('capped to an older version');
+  });
+
+  it('includes a stable-version policy section when there are stability notes', () => {
+    const body = buildPullRequestBody({
+      ...BASE_OPTIONS,
+      mode: 'non-breaking',
+      changes: [CHANGE],
+      stabilityNotes: [
+        { ecosystem: 'npm', path: 'app', name: 'left-pad', reason: 'version contains "beta"' },
+      ],
+    });
+    expect(body).toContain('## Stable-version policy');
+    expect(body).toContain('version contains "beta"');
   });
 
   it('omits the commands section when no commands were run', () => {

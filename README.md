@@ -20,6 +20,10 @@
   release age makes, so a compromised release has a window to get caught before it reaches you. A
   version that fixes a known vulnerability always bypasses this. See
   [release-age policy](_docs/configuration.md#release-age-policy).
+- **Stable versions only.** An update that resolves to an alpha, beta, rc, snapshot, or other
+  pre-release is walked back to the newest stable version, and the pull request says why. Set
+  `allowUnstableVersions: true` in the config file to allow them. See
+  [stable-version policy](_docs/configuration.md#stable-version-policy).
 
 ## Usage
 

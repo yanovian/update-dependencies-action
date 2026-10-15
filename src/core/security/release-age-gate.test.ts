@@ -77,6 +77,7 @@ describe('applyReleaseAgeGate', () => {
 
     const result = await applyReleaseAgeGate([CHANGE], {
       minAgeDays: 3,
+      stableOnly: true,
       manifestsUpdated: [MANIFEST],
       pluginRegistry: registry,
       repoRoot: '/repo',
@@ -101,6 +102,7 @@ describe('applyReleaseAgeGate', () => {
 
     const result = await applyReleaseAgeGate([CHANGE], {
       minAgeDays: 3,
+      stableOnly: true,
       manifestsUpdated: [MANIFEST],
       pluginRegistry: registry,
       repoRoot: '/repo',
@@ -109,6 +111,31 @@ describe('applyReleaseAgeGate', () => {
 
     expect(result.changes).toEqual([CHANGE]);
     expect(result.ageGateNotes).toEqual([]);
+  });
+
+  it('never walks back to an unstable version when stableOnly is set', async () => {
+    mocks.findVulnerableEntries.mockResolvedValue([]);
+    mocks.getVersionDates.mockResolvedValue(
+      new Map([
+        ['1.0.0', daysAgo(40)],
+        ['1.3.0', daysAgo(20)],
+        ['1.4.0-beta.1', daysAgo(5)],
+        ['1.5.0', daysAgo(1)],
+      ]),
+    );
+    const pinVersion = vi.fn().mockResolvedValue(true);
+    const registry = makeRegistry({ pinVersion });
+
+    const result = await applyReleaseAgeGate([CHANGE], {
+      minAgeDays: 3,
+      stableOnly: true,
+      manifestsUpdated: [MANIFEST],
+      pluginRegistry: registry,
+      repoRoot: '/repo',
+      logger,
+    });
+
+    expect(result.changes).toEqual([{ ...CHANGE, toVersion: '1.3.0' }]);
   });
 
   it('downgrades to the newest compliant same-major version and preserves breaking-ness', async () => {
@@ -125,6 +152,7 @@ describe('applyReleaseAgeGate', () => {
 
     const result = await applyReleaseAgeGate([CHANGE], {
       minAgeDays: 3,
+      stableOnly: true,
       manifestsUpdated: [MANIFEST],
       pluginRegistry: registry,
       repoRoot: '/repo',
@@ -156,6 +184,7 @@ describe('applyReleaseAgeGate', () => {
 
     const result = await applyReleaseAgeGate([CHANGE], {
       minAgeDays: 3,
+      stableOnly: true,
       manifestsUpdated: [MANIFEST],
       pluginRegistry: registry,
       repoRoot: '/repo',
@@ -188,6 +217,7 @@ describe('applyReleaseAgeGate', () => {
 
     const result = await applyReleaseAgeGate([CHANGE, otherChange], {
       minAgeDays: 3,
+      stableOnly: true,
       manifestsUpdated: [MANIFEST, otherManifest],
       pluginRegistry: registry,
       repoRoot: '/repo',
@@ -212,6 +242,7 @@ describe('applyReleaseAgeGate', () => {
 
     const result = await applyReleaseAgeGate([CHANGE], {
       minAgeDays: 3,
+      stableOnly: true,
       manifestsUpdated: [MANIFEST],
       pluginRegistry: registry,
       repoRoot: '/repo',
@@ -241,6 +272,7 @@ describe('applyReleaseAgeGate', () => {
 
     const result = await applyReleaseAgeGate([CHANGE], {
       minAgeDays: 3,
+      stableOnly: true,
       manifestsUpdated: [MANIFEST],
       pluginRegistry: registry,
       repoRoot: '/repo',
@@ -269,6 +301,7 @@ describe('applyReleaseAgeGate', () => {
 
     const result = await applyReleaseAgeGate([CHANGE], {
       minAgeDays: 3,
+      stableOnly: true,
       manifestsUpdated: [MANIFEST],
       pluginRegistry: registry,
       repoRoot: '/repo',
@@ -298,6 +331,7 @@ describe('applyReleaseAgeGate', () => {
 
     const result = await applyReleaseAgeGate([CHANGE], {
       minAgeDays: 3,
+      stableOnly: true,
       manifestsUpdated: [MANIFEST, secondManifest],
       pluginRegistry: registry,
       repoRoot: '/repo',
@@ -322,6 +356,7 @@ describe('applyReleaseAgeGate', () => {
 
     const result = await applyReleaseAgeGate([CHANGE], {
       minAgeDays: 3,
+      stableOnly: true,
       manifestsUpdated: [MANIFEST],
       pluginRegistry: registry,
       repoRoot: '/repo',
@@ -340,6 +375,7 @@ describe('applyReleaseAgeGate', () => {
 
     const result = await applyReleaseAgeGate([CHANGE], {
       minAgeDays: 3,
+      stableOnly: true,
       manifestsUpdated: [MANIFEST],
       pluginRegistry: registry,
       repoRoot: '/repo',
@@ -358,6 +394,7 @@ describe('applyReleaseAgeGate', () => {
 
     const result = await applyReleaseAgeGate([indirectChange], {
       minAgeDays: 3,
+      stableOnly: true,
       manifestsUpdated: [MANIFEST],
       pluginRegistry: registry,
       repoRoot: '/repo',

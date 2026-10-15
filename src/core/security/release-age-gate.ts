@@ -6,7 +6,6 @@ import type {
   ManifestLocation,
   ManualNote,
   PackageChange,
-  PinTarget,
   UpdateContext,
 } from '../types/ecosystem-plugin.js';
 import { isMajorBump } from '../update/diff-versions.js';
@@ -14,12 +13,22 @@ import { findVulnerableEntries } from './osv-client.js';
 import { pickSafeCompliantVersion } from './release-age-candidate.js';
 import { downgradedNote, flaggedNote, heldBackNote, unverifiedNote } from './release-age-notes.js';
 import { evaluateGroupedByManifest } from './release-age-scheduler.js';
-import { getVersionDates } from './release-date-registry.js';
+import {
+  createVersionDateCache,
+  findManifestLocation,
+  pinTarget,
+  tryPin,
+  type VersionDateCache,
+} from './gate-pinning.js';
+import { unstableVersionsOf } from './version-stability.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export interface ReleaseAgeGateOptions {
   readonly minAgeDays: number;
+  /** When true, a version that isn't a stable release is never picked as the walked-back
+   * candidate (see version-stability.ts). */
+  readonly stableOnly: boolean;
   readonly manifestsUpdated: readonly ManifestLocation[];
   readonly pluginRegistry: PluginRegistry;
   readonly repoRoot: string;
@@ -33,6 +42,7 @@ export interface ReleaseAgeGateResult {
 
 interface GateEnv {
   readonly minAgeDays: number;
+  readonly stableOnly: boolean;
   readonly manifestsUpdated: readonly ManifestLocation[];
   readonly pluginRegistry: PluginRegistry;
   readonly ctx: UpdateContext;
@@ -59,9 +69,10 @@ export async function applyReleaseAgeGate(
   changes: readonly PackageChange[],
   options: ReleaseAgeGateOptions,
 ): Promise<ReleaseAgeGateResult> {
-  const { minAgeDays, manifestsUpdated, pluginRegistry, repoRoot, logger } = options;
+  const { minAgeDays, stableOnly, manifestsUpdated, pluginRegistry, repoRoot, logger } = options;
   const env: GateEnv = {
     minAgeDays,
+    stableOnly,
     manifestsUpdated,
     pluginRegistry,
     ctx: { repoRoot, logger },
@@ -136,11 +147,14 @@ async function applyCompliantVersion(
 ): Promise<ChangeOutcome> {
   const { change, versionDates, toDate, thresholdDate } = check;
   const location = findManifestLocation(env.manifestsUpdated, change);
-  const compliant = await pickSafeCompliantVersion(change, versionDates, thresholdDate);
+  const excluded = env.stableOnly
+    ? unstableVersionsOf(change.ecosystem, versionDates.keys())
+    : new Set<string>();
+  const compliant = await pickSafeCompliantVersion(change, versionDates, thresholdDate, excluded);
 
   if (!compliant) {
     const reverted = location
-      ? await tryPin(plugin, location, pinTarget(change, change.fromVersion), env)
+      ? await tryPin(plugin, location, pinTarget(change, change.fromVersion), env.ctx)
       : false;
     // A successful revert means the file is genuinely back to fromVersion, so there is nothing
     // left to report. A failed revert leaves the too-fresh toVersion sitting on disk exactly as
@@ -153,7 +167,7 @@ async function applyCompliantVersion(
   }
 
   const pinned = location
-    ? await tryPin(plugin, location, pinTarget(change, compliant.version), env)
+    ? await tryPin(plugin, location, pinTarget(change, compliant.version), env.ctx)
     : false;
   if (!pinned) {
     return { change, note: flaggedNote(change, toDate, env.minAgeDays) };
@@ -166,34 +180,6 @@ async function applyCompliantVersion(
       breaking: isMajorBump(change.fromVersion, compliant.version),
     },
     note: downgradedNote(change, compliant.version, env.minAgeDays),
-  };
-}
-
-/** The plugin's own resolver already wrote `change.toVersion` to disk, so that (not the original
- * pre-run `change.fromVersion`) is what's currently declared there. */
-function pinTarget(change: PackageChange, version: string): PinTarget {
-  return { name: change.name, fromVersion: change.toVersion, version };
-}
-
-interface VersionDateCache {
-  get(ecosystem: EcosystemId, name: string): Promise<Map<string, Date> | null>;
-}
-
-/** Memoizes per (ecosystem, name), since the same package can appear as more than one change
- * across different directories in the same run. */
-function createVersionDateCache(): VersionDateCache {
-  const cache = new Map<string, Promise<Map<string, Date> | null>>();
-  return {
-    get(ecosystem, name) {
-      const key = `${ecosystem}::${name}`;
-      const cached = cache.get(key);
-      if (cached) {
-        return cached;
-      }
-      const promise = getVersionDates(ecosystem, name);
-      cache.set(key, promise);
-      return promise;
-    },
   };
 }
 
@@ -224,40 +210,4 @@ async function findVulnerableCurrentVersions(
 
 function versionKey(ecosystem: EcosystemId, name: string, version: string): string {
   return `${ecosystem}::${name}::${version}`;
-}
-
-/**
- * Returns undefined (declining to pin, falling back to flagging) rather than guessing when more
- * than one manifest matches: most ecosystems have exactly one manifest per (ecosystem, directory),
- * but NuGet allows several .csproj files in the same directory, and picking the first one would
- * risk rewriting the wrong project file.
- */
-function findManifestLocation(
-  manifestsUpdated: readonly ManifestLocation[],
-  change: PackageChange,
-): ManifestLocation | undefined {
-  const matches = manifestsUpdated.filter(
-    (manifest) => manifest.ecosystem === change.ecosystem && manifest.directory === change.path,
-  );
-  return matches.length === 1 ? matches[0] : undefined;
-}
-
-async function tryPin(
-  plugin: DependencyUpdatePlugin,
-  location: ManifestLocation,
-  target: PinTarget,
-  env: GateEnv,
-): Promise<boolean> {
-  if (!plugin.pinVersion) {
-    return false;
-  }
-  try {
-    return await plugin.pinVersion(location, target, env.ctx);
-  } catch (error) {
-    env.logger.warn(
-      `Failed to pin ${target.name} to ${target.version} in ${location.directory}: ` +
-        `${(error as Error).message}`,
-    );
-    return false;
-  }
 }

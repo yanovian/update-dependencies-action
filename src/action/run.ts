@@ -19,10 +19,10 @@ import {
   writePullRequestBodyToDisk,
   writeSummaryToDisk,
 } from '../core/reporting/report-builder.js';
-import { applyReleaseAgeGate } from '../core/security/release-age-gate.js';
-import type { ManualNote, PackageChange } from '../core/types/ecosystem-plugin.js';
+import type { ResolvedConfig } from '../core/config/config-schema.js';
 import { updateRepo, type UpdateRepoResult } from '../core/update/update-repo.js';
 import { getUtcDateString } from '../core/util/current-date.js';
+import { gateChanges, type GateNotes } from './gate-changes.js';
 import type { ActionInputs } from './inputs.js';
 import { readActionInputs } from './inputs.js';
 import { setActionOutputs } from './outputs.js';
@@ -42,8 +42,9 @@ function summaryOutputDir(): string {
   return process.env.RUNNER_TEMP ?? tmpdir();
 }
 
-interface RunContext {
+export interface RunContext {
   readonly inputs: ActionInputs;
+  readonly config: ResolvedConfig;
   readonly repoRoot: string;
   readonly logger: Logger;
 }
@@ -54,8 +55,8 @@ export async function run(logger: Logger): Promise<void> {
     process.env.GITHUB_WORKSPACE ?? process.cwd(),
     inputs.workingDirectory,
   );
-  const ctx: RunContext = { inputs, repoRoot, logger };
   const config = await loadConfig(path.join(repoRoot, inputs.configPath));
+  const ctx: RunContext = { inputs, config, repoRoot, logger };
 
   logger.info('Scanning repository for package managers');
   const repoFiles = await listRepoFiles(repoRoot);
@@ -68,18 +69,20 @@ export async function run(logger: Logger): Promise<void> {
     logger,
   });
 
-  const ageGate = await gateChanges(ctx, updateResult, registry);
-  const changes = ageGate.changes;
+  const { changes, notes } = await gateChanges(ctx, updateResult, registry);
   const manualActionNeeded = updateResult.manualActionNeeded;
 
-  // Deliberately ignores ageGateNotes here: every note that leaves a real, uncommitted disk
+  // Deliberately ignores the gate notes here: every note that leaves a real, uncommitted disk
   // change behind keeps that change in `changes` too (see release-age-gate.ts), so a note with
   // no accompanying change means the file is genuinely unchanged, nothing to commit. Requiring
-  // ageGateNotes to also be empty would send `git commit` down a path that fails outright when
+  // the notes to also be empty would send `git commit` down a path that fails outright when
   // there is nothing staged.
   if (changes.length === 0 && manualActionNeeded.length === 0) {
     logger.info('No dependency updates found.');
-    for (const note of ageGate.ageGateNotes) {
+    for (const note of notes.stabilityNotes) {
+      logger.info(`Stable-version policy — ${note.name ?? note.path}: ${note.reason}`);
+    }
+    for (const note of notes.ageGateNotes) {
       logger.info(`Release-age policy — ${note.name ?? note.path}: ${note.reason}`);
     }
     const summaryPath = await writeSummaryToDisk(
@@ -87,7 +90,7 @@ export async function run(logger: Logger): Promise<void> {
         mode: inputs.updateStrategy,
         changes: [],
         manualActionNeeded: [],
-        ageGateNotes: ageGate.ageGateNotes,
+        ...notes,
         commands: [],
       },
       summaryOutputDir(),
@@ -99,35 +102,13 @@ export async function run(logger: Logger): Promise<void> {
   const pathCount = new Set(changes.map((change) => change.path)).size;
   logger.info(`Found ${changes.length} package update(s) across ${pathCount} path(s).`);
 
-  await verifyAndPublish(ctx, { ...updateResult, changes }, ageGate.ageGateNotes);
-}
-
-/** Skipped entirely (no network calls) when the policy is disabled, rather than calling the gate
- * with a threshold of zero days, which would still spend a registry round trip per package only
- * to confirm every version already clears it. */
-async function gateChanges(
-  ctx: RunContext,
-  updateResult: UpdateRepoResult,
-  registry: PluginRegistry,
-): Promise<{ changes: PackageChange[]; ageGateNotes: ManualNote[] }> {
-  const { inputs, repoRoot, logger } = ctx;
-  if (inputs.minReleaseAgeDays <= 0) {
-    return { changes: updateResult.changes, ageGateNotes: [] };
-  }
-  logger.info(`Applying the ${inputs.minReleaseAgeDays}-day minimum release age policy`);
-  return applyReleaseAgeGate(updateResult.changes, {
-    minAgeDays: inputs.minReleaseAgeDays,
-    manifestsUpdated: updateResult.manifestsUpdated,
-    pluginRegistry: registry,
-    repoRoot,
-    logger,
-  });
+  await verifyAndPublish(ctx, { ...updateResult, changes }, notes);
 }
 
 async function verifyAndPublish(
   ctx: RunContext,
   updateResult: UpdateRepoResult,
-  ageGateNotes: readonly ManualNote[],
+  notes: GateNotes,
 ): Promise<void> {
   const { inputs, repoRoot, logger } = ctx;
   const commandSummary = await runCommands(parseCommands(inputs.checkCommands), repoRoot, logger);
@@ -136,7 +117,7 @@ async function verifyAndPublish(
       mode: inputs.updateStrategy,
       changes: updateResult.changes,
       manualActionNeeded: updateResult.manualActionNeeded,
-      ageGateNotes,
+      ...notes,
       commands: commandSummary.results,
     },
     summaryOutputDir(),
@@ -151,14 +132,14 @@ async function verifyAndPublish(
   }
 
   await publishPullRequest(ctx, updateResult, {
-    ageGateNotes,
+    notes,
     commandResults: commandSummary.results,
     summaryPath,
   });
 }
 
 interface PublishInput {
-  readonly ageGateNotes: readonly ManualNote[];
+  readonly notes: GateNotes;
   readonly commandResults: readonly CommandResult[];
   readonly summaryPath: string;
 }
@@ -172,8 +153,8 @@ async function publishPullRequest(
   input: PublishInput,
 ): Promise<void> {
   const { inputs, logger } = ctx;
-  const { ageGateNotes, commandResults, summaryPath } = input;
-  const content = await buildPullRequestContent(ctx, updateResult, ageGateNotes, commandResults);
+  const { notes, commandResults, summaryPath } = input;
+  const content = await buildPullRequestContent(ctx, updateResult, notes, commandResults);
   const bodyPath = await writePullRequestBodyToDisk(content.body, summaryOutputDir());
   const baseOutputs = {
     updated: true,
@@ -212,7 +193,7 @@ interface PullRequestContent {
 async function buildPullRequestContent(
   ctx: RunContext,
   updateResult: UpdateRepoResult,
-  ageGateNotes: readonly ManualNote[],
+  notes: GateNotes,
   commandResults: readonly CommandResult[],
 ): Promise<PullRequestContent> {
   const { inputs } = ctx;
@@ -229,7 +210,7 @@ async function buildPullRequestContent(
       mode: inputs.updateStrategy,
       changes: updateResult.changes,
       manualActionNeeded: updateResult.manualActionNeeded,
-      ageGateNotes,
+      ...notes,
       minReleaseAgeDays: inputs.minReleaseAgeDays,
       commandResults,
       runDate,

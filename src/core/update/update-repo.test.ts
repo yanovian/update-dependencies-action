@@ -15,7 +15,12 @@ const MANIFEST: ManifestLocation = {
 };
 
 const logger: Logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), group: (_name, fn) => fn() };
-const config = { version: 1 as const, ecosystems: {}, ignorePaths: [] };
+const config = {
+  version: 1 as const,
+  ecosystems: {},
+  ignorePaths: [],
+  allowUnstableVersions: false,
+};
 
 function registryWith(plugin: DependencyUpdatePlugin) {
   return {

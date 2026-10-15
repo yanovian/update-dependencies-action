@@ -9,6 +9,7 @@ export interface PrBodyOptions {
   readonly changes: readonly PackageChange[];
   readonly manualActionNeeded: readonly ManualNote[];
   readonly ageGateNotes: readonly ManualNote[];
+  readonly stabilityNotes: readonly ManualNote[];
   readonly minReleaseAgeDays: number;
   readonly commandResults: readonly CommandResult[];
   readonly runDate: string;
@@ -29,8 +30,9 @@ export function buildPullRequestBody(options: PrBodyOptions): string {
   const sections = [
     buildRunDateNote(options.runDate, options.minReleaseAgeDays),
     buildChangesTable(options.changes),
-    buildAgeGateSection(options.ageGateNotes),
-    buildManualNotesSection(options.manualActionNeeded),
+    buildNotesSection('Stable-version policy', options.stabilityNotes),
+    buildNotesSection('Release-age policy', options.ageGateNotes),
+    buildNotesSection('Needs a manual look', options.manualActionNeeded),
     buildCommandsSection(options.commandResults),
     buildStalePullRequestsSection(options.stalePullRequests),
     buildSecuritySection(),
@@ -51,14 +53,14 @@ function buildRunDateNote(runDate: string, minReleaseAgeDays: number): string {
   );
 }
 
-function buildAgeGateSection(notes: readonly ManualNote[]): string {
+function buildNotesSection(heading: string, notes: readonly ManualNote[]): string {
   if (notes.length === 0) {
     return '';
   }
   const items = notes.map(
     (note) => `- **${note.path}**${note.name ? ` (${note.name})` : ''}: ${note.reason}`,
   );
-  return ['## Release-age policy', '', ...items].join('\n');
+  return [`## ${heading}`, '', ...items].join('\n');
 }
 
 function buildChangesTable(changes: readonly PackageChange[]): string {
@@ -80,16 +82,6 @@ function buildChangesTable(changes: readonly PackageChange[]): string {
     '| --- | --- | --- | --- | --- | --- |',
     ...rows,
   ].join('\n');
-}
-
-function buildManualNotesSection(notes: readonly ManualNote[]): string {
-  if (notes.length === 0) {
-    return '';
-  }
-  const items = notes.map(
-    (note) => `- **${note.path}**${note.name ? ` (${note.name})` : ''}: ${note.reason}`,
-  );
-  return ['## Needs a manual look', '', ...items].join('\n');
 }
 
 function buildCommandsSection(commandResults: readonly CommandResult[]): string {

@@ -1,8 +1,8 @@
 # Configuration
 
 Everything that changes how a single run behaves is a workflow input. The config file is only
-for the one thing that needs to persist across runs and doesn't fit as an input: which
-ecosystems and paths to skip.
+for what needs to persist across runs and doesn't fit as an input: which ecosystems and paths to
+skip, and whether unstable versions are allowed.
 
 ## Inputs
 
@@ -53,6 +53,36 @@ unverified, rather than a rate-limited registry making the whole run unreliable.
 Set `min-release-age-days: 0` to disable this entirely and go back to always updating to whatever
 is latest.
 
+## Stable-version policy
+
+By default, this Action only updates to stable versions. A version counts as unstable if it
+contains any of these words, ignoring case: `alpha`, `beta`, `rc`, `pre`, `prerelease`,
+`preview`, `dev`, `snapshot`, `canary`, `nightly`, `next`, `unstable`, `experimental`,
+`insiders`, `milestone`. Whole words only, so a stable qualifier that merely contains one (like
+`express`) isn't caught.
+
+On top of that, each ecosystem's own definition of a pre-release applies:
+
+| Ecosystem | Also unstable | Still stable |
+| --- | --- | --- |
+| npm, Yarn, pnpm, Cargo, NuGet | Anything after a `-` (SemVer pre-release), like `1.0.0-0` or `6.0.0-ci.5` | Build metadata after `+` |
+| Go | Same as SemVer | Pseudo-versions like `v0.0.0-20240101120000-abcdef123456`, since an untagged module has nothing else |
+| pip | PEP 440 `a`, `b`, `c`, `rc`, `.dev`, like `1.0a1` | `.post` releases |
+| Bundler | Any letter in the version, like `1.0.0.pre` | |
+| Maven, Gradle | `a1`, `b1`, `M1`, `CR1`, `ea` | `Final`, `GA`, `RELEASE`, `SP1`, and qualifiers like `-jre` or `-android` |
+| Composer | `a` and `b` stability flags, like `1.0.0-b2` | `p` / `patch` releases |
+
+When an update resolves to an unstable version, it's walked back to the newest stable version
+that is still newer than what you have, and the pull request explains why under
+"Stable-version policy". If there is no such version, or the registry can't be reached to check,
+the update is reverted instead. Unlike the release-age policy, this never lets an update through
+unverified. Bundler can't pin a single gem to an exact version, so an unstable RubyGems update is
+left as-is and flagged in the pull request instead.
+
+The release-age policy also never walks back to an unstable version while this is on.
+
+To allow unstable versions, set `allowUnstableVersions: true` in the config file below.
+
 ## Config file
 
 Save this as `.github/update-dependencies.yml`, directly under `.github/`, not inside
@@ -70,6 +100,8 @@ ecosystems:
 ignorePaths:
   - examples
   - test-fixtures
+
+allowUnstableVersions: false # set to true to allow alpha, beta, rc, etc.
 ```
 
 - `ecosystems`: set any of `npm`, `yarn`, `pnpm`, `pip`, `cargo`, `go`, `maven`, `gradle`,
@@ -77,6 +109,8 @@ ignorePaths:
 - `ignorePaths`: a list of path prefixes, relative to the repo root, to skip entirely. A manifest
   is skipped if its directory equals or sits inside one of these prefixes. This is a prefix
   match, not a glob pattern.
+- `allowUnstableVersions`: `false` by default. Set to `true` to allow updating to pre-release
+  versions, see [stable-version policy](#stable-version-policy).
 
 Per-package ignoring is not supported yet. See
 [FAQ and limitations](faq-and-limitations.md) for why.

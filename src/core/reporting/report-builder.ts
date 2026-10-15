@@ -11,6 +11,7 @@ export interface UpdateSummary {
   readonly changes: readonly PackageChange[];
   readonly manualActionNeeded: readonly ManualNote[];
   readonly ageGateNotes: readonly ManualNote[];
+  readonly stabilityNotes: readonly ManualNote[];
   readonly commands: readonly CommandResult[];
 }
 

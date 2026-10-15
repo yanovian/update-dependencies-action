@@ -19,3 +19,7 @@ ecosystems:
 ignorePaths:
   - examples
   - test-fixtures
+
+# Only stable versions are used by default. An update to a version containing alpha, beta, rc,
+# snapshot, etc. is walked back to the newest stable version. Set to true to allow them.
+allowUnstableVersions: false

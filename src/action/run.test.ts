@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   findStalePullRequests: vi.fn(),
   resolveBaseBranch: vi.fn(),
   applyReleaseAgeGate: vi.fn(),
+  applyStableVersionGate: vi.fn(),
   readActionInputs: vi.fn(),
 }));
 
@@ -52,6 +53,9 @@ vi.mock('../core/github/pr-manager.js', () => ({
 vi.mock('../core/github/base-branch.js', () => ({ resolveBaseBranch: mocks.resolveBaseBranch }));
 vi.mock('../core/security/release-age-gate.js', () => ({
   applyReleaseAgeGate: mocks.applyReleaseAgeGate,
+}));
+vi.mock('../core/security/stable-version-gate.js', () => ({
+  applyStableVersionGate: mocks.applyStableVersionGate,
 }));
 vi.mock('../core/plugins/all-plugins.js', () => ({ createAllPlugins: () => [] }));
 vi.mock('../core/util/current-date.js', () => ({ getUtcDateString: () => '2026-07-16' }));
@@ -92,7 +96,16 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.readActionInputs.mockReturnValue(DEFAULT_INPUTS);
   mocks.listRepoFiles.mockResolvedValue([]);
-  mocks.loadConfig.mockResolvedValue({ version: 1, ecosystems: {}, ignorePaths: [] });
+  mocks.loadConfig.mockResolvedValue({
+    version: 1,
+    ecosystems: {},
+    ignorePaths: [],
+    allowUnstableVersions: false,
+  });
+  mocks.applyStableVersionGate.mockImplementation(async (changes: unknown[]) => ({
+    changes,
+    stabilityNotes: [],
+  }));
   mocks.writeSummaryToDisk.mockResolvedValue('/repo/update-dependencies-summary.json');
   mocks.writePullRequestBodyToDisk.mockResolvedValue('/repo/update-dependencies-pr-body.md');
   mocks.parseCommands.mockReturnValue(['npm test']);
@@ -276,6 +289,51 @@ describe('run', () => {
       }),
       expect.any(String),
     );
+  });
+
+  it('runs the stable-version gate before the release-age gate and reports its notes', async () => {
+    mocks.readActionInputs.mockReturnValue({ ...DEFAULT_INPUTS, minReleaseAgeDays: 3 });
+    const betaChange = { ...CHANGE, toVersion: '2.0.0-beta.1' };
+    mocks.updateRepo.mockResolvedValue({
+      manifestsUpdated: [MANIFEST],
+      changes: [betaChange],
+      manualActionNeeded: [],
+    });
+    const note = { ecosystem: 'npm' as const, path: '.', name: 'left-pad', reason: 'beta' };
+    mocks.applyStableVersionGate.mockResolvedValue({ changes: [CHANGE], stabilityNotes: [note] });
+    mocks.applyReleaseAgeGate.mockResolvedValue({ changes: [CHANGE], ageGateNotes: [] });
+    mocks.runCommands.mockResolvedValue({ results: [], allSucceeded: true, failedCommand: null });
+
+    await run(logger);
+
+    expect(mocks.applyStableVersionGate).toHaveBeenCalledWith([betaChange], expect.any(Object));
+    expect(mocks.applyReleaseAgeGate).toHaveBeenCalledWith(
+      [CHANGE],
+      expect.objectContaining({ stableOnly: true }),
+    );
+    expect(mocks.writeSummaryToDisk).toHaveBeenCalledWith(
+      expect.objectContaining({ stabilityNotes: [note] }),
+      expect.any(String),
+    );
+  });
+
+  it('skips the stable-version gate when allowUnstableVersions is set in the config', async () => {
+    mocks.loadConfig.mockResolvedValue({
+      version: 1,
+      ecosystems: {},
+      ignorePaths: [],
+      allowUnstableVersions: true,
+    });
+    mocks.updateRepo.mockResolvedValue({
+      manifestsUpdated: [MANIFEST],
+      changes: [CHANGE],
+      manualActionNeeded: [],
+    });
+    mocks.runCommands.mockResolvedValue({ results: [], allSucceeded: true, failedCommand: null });
+
+    await run(logger);
+
+    expect(mocks.applyStableVersionGate).not.toHaveBeenCalled();
   });
 
   it('treats the gate holding every change back as nothing changed, skipping commands and the PR', async () => {
