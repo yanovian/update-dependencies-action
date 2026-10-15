@@ -20,6 +20,7 @@ runs from the directory holding `settings.gradle(.kts)`, the same way you would 
 | RubyGems (Bundler) | Ruby | Gemfile + Gemfile.lock | `bundle update --conservative --patch --minor` | `bundle update` |
 | Composer | PHP | composer.json + composer.lock | `composer update --with-all-dependencies` | looks up each package's latest version, then `composer require pkg:^latest` |
 | NuGet | C#/.NET | *.csproj | `dotnet list package --outdated`, then `dotnet add package <id> --version <v>` for each package within the same major | same, any major |
+| GitHub Actions | YAML | .github/workflows/*.yml, action.yml | rewrites each `uses:` ref to the newest tag within the same major | rewrites to the newest tag, any major (the default for this ecosystem, see below) |
 
 **pnpm workspaces.** A workspace member doesn't need its own `pnpm-lock.yaml`. This Action detects
 `pnpm-workspace.yaml` and resolves each member against the workspace root's lockfile instead,
@@ -31,6 +32,40 @@ hand-edits a lockfile. The only files it rewrites directly are plain manifest fi
 command of their own for this (requirements.txt, Cargo.toml for a major bump, a Gradle version
 catalog or build file), and even then only in a form it can confidently recognize. Anything it
 finds but chooses not to touch is called out in the pull request instead of being guessed at.
+
+## GitHub Actions
+
+Every `uses: owner/repo@ref` in your workflow files (`.github/workflows/*.yml` and `*.yaml`) and
+in composite actions (`action.yml` or `action.yaml` anywhere in your repo) is checked, including
+actions in a subfolder (`github/codeql-action/init@v3`) and reusable workflows
+(`owner/repo/.github/workflows/ci.yml@v1`).
+
+| Your ref | What happens |
+| --- | --- |
+| `@v4`, `@v4.1`, `@v4.1.0` | Moved to the newest tag of the same shape: `v4` to `v5`, `v4.1.0` to `v5.0.2`. A floating tag never becomes a fixed one or the other way around. |
+| `@<commit-sha> # v4.1.0` | The SHA is moved to the newest tag's commit, and the comment to that tag. This is the format SHA-pinning tools write. |
+| `@<commit-sha>` with no version comment | Left alone and listed under "Needs a manual look". Add a `# vX.Y.Z` comment after the SHA to have it kept up to date. |
+| `@main`, any branch | Left alone. A branch already tracks whatever is newest. |
+| `./local-action`, `docker://...` | Left alone. There's no tag to move to. |
+
+**Breaking by default.** GitHub Actions update across majors even when `update-strategy` is
+`non-breaking`, because a floating tag like `v4` already gets every non-breaking release on its
+own and would otherwise never move. Set `updateStrategies: { github-actions: non-breaking }` in
+the [config file](configuration.md#config-file) to keep them within their current major, or
+`ecosystems: { github-actions: false }` to stop checking them at all.
+
+**Nothing to install.** Tags and release dates come straight from the GitHub REST API over
+HTTPS, using `github-token` when you give it one. No `gh`, no extra step in your workflow.
+Without a token, GitHub allows far fewer API requests per hour, so pass one if you have many
+actions. If GitHub rate limits the run, the run doesn't fail and doesn't wait for the limit to
+reset: the actions it couldn't check are listed under "Needs a manual look" and are checked again
+on the next run.
+
+**Workflow files need a token with the `workflows` permission.** GitHub only lets a token with
+that permission push changes to `.github/workflows/`, and the default `GITHUB_TOKEN` can never
+have it. With the default token, this Action opens the pull request without the workflow file
+updates and lists what it left out. Composite actions outside `.github/workflows/` aren't
+affected. See [why weren't my workflow files updated](faq-and-limitations.md#why-werent-my-workflow-files-updated).
 
 ## What "non-breaking" and "breaking" mean here
 

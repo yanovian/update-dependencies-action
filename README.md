@@ -8,6 +8,10 @@
 
 - **Scans every package manager in your repo, in one run.** npm, Yarn, pnpm, pip, Cargo, Go,
   Maven, Gradle, Bundler, Composer, and NuGet, across every path in a monorepo, not just the root.
+- **Keeps your GitHub Actions current too.** Every `uses: owner/repo@v4` in your workflows and
+  composite actions is moved to the newest tag, majors included by default. Turn it off or keep
+  it within the current major in the config file. See
+  [GitHub Actions](_docs/supported-package-managers.md#github-actions).
 - **Opens a pull request either way, gated on checks when you give it any.** Put your tests,
   lint, and build in `check-commands` to stop a failing update before a pull request ever opens,
   or leave it empty and let your repo's own pull request CI check it there instead. See
@@ -88,6 +92,7 @@ Don't trigger this Action itself on `pull_request`. See
 | Bundler | Ruby | Gemfile + Gemfile.lock |
 | Composer | PHP | composer.json + composer.lock |
 | NuGet | C#/.NET | *.csproj |
+| GitHub Actions | YAML | `uses:` refs in .github/workflows/*.yml and action.yml |
 
 Every manifest in the repo gets updated, not just the ones at the root, so a monorepo with
 several languages gets all of them in one run. Full detail on exactly which command runs for each

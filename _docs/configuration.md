@@ -2,13 +2,13 @@
 
 Everything that changes how a single run behaves is a workflow input. The config file is only
 for what needs to persist across runs and doesn't fit as an input: which ecosystems and paths to
-skip, and whether unstable versions are allowed.
+skip, per-ecosystem update strategies, and whether unstable versions are allowed.
 
 ## Inputs
 
 | Input | Default | What it does |
 | --- | --- | --- |
-| `update-strategy` | `non-breaking` | `non-breaking` keeps every package within its current major version. `breaking` allows major version jumps too. |
+| `update-strategy` | `non-breaking` | `non-breaking` keeps every package within its current major version. `breaking` allows major version jumps too. GitHub Actions ignore this and update as `breaking` unless you set `updateStrategies` in the [config file](#config-file). |
 | `check-commands` | (empty) | Commands to run after updating, one per line, in order. Every command must exit 0 or no pull request is created. Leave empty to rely on your repo's own pull request CI instead, see [check-commands or your own CI](faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use) in the FAQ. |
 | `min-release-age-days` | `3` | Minimum number of days a version must have been published before this Action will update to it. A version that fixes a known vulnerability always bypasses this. Set to `0` to disable. See [release-age policy](#release-age-policy) below. |
 | `create-pull-request` | `true` | Whether to open a pull request when there are updates and every command passed. Set to `false` to leave the updated files in the working tree instead, for example if you want to commit them yourself in a later step. |
@@ -16,7 +16,7 @@ skip, and whether unstable versions are allowed.
 | `branch-name` | `chore/update-deps/<update-strategy>` | Prefix for the branch this Action commits to. The actual branch is `<branch-name>/<run-date>`, see [does it create a new pull request every time it runs](faq-and-limitations.md#does-it-create-a-new-pull-request-every-time-it-runs) in the FAQ. Example: [`examples/with-branch-name/`](../examples/with-branch-name/). |
 | `config-path` | `.github/update-dependencies.yml` | Path to the config file described below. Missing is fine, everything is scanned by default. |
 | `working-directory` | `.` | Directory to scan, relative to the repo root. Use this if the Action should only look at part of a larger repo. |
-| `github-token` | `${{ github.token }}` | Token used to push the branch and open the pull request. Only needed when `create-pull-request` is `true`; leave it empty otherwise, see [posting the pull request without a token](faq-and-limitations.md#can-i-avoid-giving-this-action-a-token-entirely) in the FAQ. A PAT is recommended over the default, see [check-commands or your own CI](faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use) in the FAQ for why. |
+| `github-token` | `${{ github.token }}` | Token used to push the branch and open the pull request. Only needed when `create-pull-request` is `true`; leave it empty otherwise, see [posting the pull request without a token](faq-and-limitations.md#can-i-avoid-giving-this-action-a-token-entirely) in the FAQ. A PAT is recommended over the default, see [check-commands or your own CI](faq-and-limitations.md#check-commands-or-your-own-ci-which-should-i-use) in the FAQ for why. Also used, read-only, to look up action tags and releases on the GitHub API, see [GitHub Actions](supported-package-managers.md#github-actions). |
 
 ## Outputs
 
@@ -36,7 +36,7 @@ A version that was just published is also the version an attacker's compromised 
 look like, before anyone has had a chance to notice. `min-release-age-days` (default `3`) holds
 back any update that resolves to a version younger than that, walking it back to the newest
 version old enough to clear the policy instead, for npm, Yarn, pnpm, pip, Cargo, Go, Maven,
-Gradle, Composer, and NuGet. Bundler has no way to pin a single gem to an exact version without
+Gradle, Composer, NuGet, and GitHub Actions. Bundler has no way to pin a single gem to an exact version without
 editing the Gemfile, so a too-fresh RubyGems update is flagged in the pull request body instead of
 adjusted.
 
@@ -49,6 +49,13 @@ fresh on the run itself (how old is this specific version, right now), same as a
 this Action already makes to a package registry. Registry or OSV.dev lookups that don't come back
 within a bounded retry window fail open: the update is let through, flagged in the pull request as
 unverified, rather than a rate-limited registry making the whole run unreliable.
+
+For GitHub Actions, a version's date is its GitHub Release's publish date. A floating tag like
+`v4` gets the date of the newest release under it, since that's the code it points to. An
+action that doesn't publish GitHub Releases can't be dated, so its update is let through and
+flagged as unverified. A floating tag is only ever walked back to another floating tag (`v5` to
+`v4`, never `v5` to `v5.0.1`), so your ref style never changes behind your back; when that isn't
+possible the update is left as-is and flagged.
 
 Set `min-release-age-days: 0` to disable this entirely and go back to always updating to whatever
 is latest.
@@ -71,6 +78,7 @@ On top of that, each ecosystem's own definition of a pre-release applies:
 | Bundler | Any letter in the version, like `1.0.0.pre` | |
 | Maven, Gradle | `a1`, `b1`, `M1`, `CR1`, `ea` | `Final`, `GA`, `RELEASE`, `SP1`, and qualifiers like `-jre` or `-android` |
 | Composer | `a` and `b` stability flags, like `1.0.0-b2` | `p` / `patch` releases |
+| GitHub Actions | Any tag that isn't `vX`, `vX.Y`, or `vX.Y.Z` (with or without the `v`), like `v5.0.0-beta.1`. These are never picked, even with `allowUnstableVersions: true`. | |
 
 When an update resolves to an unstable version, it's walked back to the newest stable version
 that is still newer than what you have, and the pull request explains why under
@@ -101,14 +109,24 @@ ignorePaths:
   - examples
   - test-fixtures
 
+updateStrategies:
+  github-actions: non-breaking # GitHub Actions default to breaking, see below
+  npm: breaking # overrides the update-strategy input for npm only
+
 allowUnstableVersions: false # set to true to allow alpha, beta, rc, etc.
 ```
 
 - `ecosystems`: set any of `npm`, `yarn`, `pnpm`, `pip`, `cargo`, `go`, `maven`, `gradle`,
-  `rubygems`, `composer`, `nuget` to `false` to skip it. Anything not listed is scanned.
+  `rubygems`, `composer`, `nuget`, `github-actions` to `false` to skip it. Anything not listed
+  is scanned, GitHub Actions included.
 - `ignorePaths`: a list of path prefixes, relative to the repo root, to skip entirely. A manifest
   is skipped if its directory equals or sits inside one of these prefixes. This is a prefix
   match, not a glob pattern.
+- `updateStrategies`: `non-breaking` or `breaking` per ecosystem, using the same names as
+  `ecosystems`. Overrides the `update-strategy` input for that ecosystem only. GitHub Actions
+  default to `breaking` even when the input is `non-breaking`, because a floating tag like `v4`
+  never moves past its major any other way. Set `github-actions: non-breaking` to keep them
+  within their current major.
 - `allowUnstableVersions`: `false` by default. Set to `true` to allow updating to pre-release
   versions, see [stable-version policy](#stable-version-policy).
 

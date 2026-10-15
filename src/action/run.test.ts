@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   createBranch: vi.fn(),
   commit: vi.fn(),
   push: vi.fn(),
+  undoLastCommit: vi.fn(),
   createOrUpdatePullRequest: vi.fn(),
   findStalePullRequests: vi.fn(),
   resolveBaseBranch: vi.fn(),
@@ -44,6 +45,7 @@ vi.mock('../core/git/git-client.js', () => ({
     createBranch: mocks.createBranch,
     commit: mocks.commit,
     push: mocks.push,
+    undoLastCommit: mocks.undoLastCommit,
   }),
 }));
 vi.mock('../core/github/pr-manager.js', () => ({
@@ -100,6 +102,7 @@ beforeEach(() => {
     version: 1,
     ecosystems: {},
     ignorePaths: [],
+    updateStrategies: {},
     allowUnstableVersions: false,
   });
   mocks.applyStableVersionGate.mockImplementation(async (changes: unknown[]) => ({
@@ -366,5 +369,65 @@ describe('run', () => {
     expect(mocks.setActionOutputs).toHaveBeenCalledWith(
       expect.objectContaining({ updated: false, commandsPassed: true }),
     );
+  });
+
+  describe('when the token cannot push workflow files', () => {
+    const WORKFLOWS_MANIFEST = {
+      ecosystem: 'github-actions' as const,
+      language: 'GitHub Actions',
+      manifestPath: '.github/workflows/ci.yml',
+      directory: '.github/workflows',
+    };
+    const WORKFLOW_CHANGE = {
+      ecosystem: 'github-actions' as const,
+      path: '.github/workflows',
+      name: 'actions/checkout',
+      fromVersion: 'v3',
+      toVersion: 'v4',
+      breaking: true,
+    };
+    const REJECTION = new Error(
+      'refusing to allow a GitHub App to create or update workflow `.github/workflows/ci.yml` without `workflows` permission',
+    );
+
+    beforeEach(() => {
+      mocks.runCommands.mockResolvedValue({ results: [], allSucceeded: true, failedCommand: null });
+    });
+
+    it('retries without the workflow files and notes them in the pull request', async () => {
+      mocks.updateRepo.mockResolvedValue({
+        manifestsUpdated: [MANIFEST, WORKFLOWS_MANIFEST],
+        changes: [CHANGE, WORKFLOW_CHANGE],
+        manualActionNeeded: [],
+      });
+      mocks.push.mockRejectedValueOnce(REJECTION).mockResolvedValueOnce(undefined);
+
+      await run(logger);
+
+      expect(mocks.undoLastCommit).toHaveBeenCalledTimes(1);
+      expect(mocks.commit).toHaveBeenLastCalledWith(['.'], expect.any(String), [
+        '.github/workflows',
+      ]);
+      const body = mocks.createOrUpdatePullRequest.mock.calls[0]?.[0].body as string;
+      expect(body).toContain('Left out of this pull request: actions/checkout v3');
+      expect(mocks.setFailed).not.toHaveBeenCalled();
+      expect(mocks.setActionOutputs).toHaveBeenCalledWith(
+        expect.objectContaining({ pullRequestNumber: 42 }),
+      );
+    });
+
+    it('fails with a clear message when workflow files were the only updates', async () => {
+      mocks.updateRepo.mockResolvedValue({
+        manifestsUpdated: [WORKFLOWS_MANIFEST],
+        changes: [WORKFLOW_CHANGE],
+        manualActionNeeded: [],
+      });
+      mocks.push.mockRejectedValueOnce(REJECTION);
+
+      await run(logger);
+
+      expect(mocks.createOrUpdatePullRequest).not.toHaveBeenCalled();
+      expect(mocks.setFailed).toHaveBeenCalledWith(expect.stringContaining('Workflows'));
+    });
   });
 });

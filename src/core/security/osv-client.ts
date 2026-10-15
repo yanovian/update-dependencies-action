@@ -17,6 +17,7 @@ const OSV_ECOSYSTEM_NAMES: Record<EcosystemId, string> = {
   rubygems: 'RubyGems',
   composer: 'Packagist',
   nuget: 'NuGet',
+  'github-actions': 'GitHub Actions',
 };
 
 export interface VulnerabilityQuery {
@@ -81,7 +82,8 @@ export async function findVulnerableEntries(
 
 function toOsvQuery(query: VulnerabilityQuery): OsvBatchQuery {
   return {
-    version: query.version,
+    // Action tags carry a "v" prefix ("v4.1.0") that OSV's GitHub Actions advisories don't.
+    version: query.ecosystem === 'github-actions' ? query.version.replace(/^v/, '') : query.version,
     package: { name: query.name, ecosystem: OSV_ECOSYSTEM_NAMES[query.ecosystem] },
   };
 }

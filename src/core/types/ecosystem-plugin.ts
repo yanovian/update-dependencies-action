@@ -12,6 +12,7 @@ export const ALL_ECOSYSTEM_IDS = [
   'rubygems',
   'composer',
   'nuget',
+  'github-actions',
 ] as const;
 
 export type EcosystemId = (typeof ALL_ECOSYSTEM_IDS)[number];

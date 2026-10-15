@@ -39,3 +39,28 @@ describe('commit', () => {
     expect(commitCall?.[0]).toBe('git commit -F "/tmp/message.txt"');
   });
 });
+
+describe('commit with excluded paths', () => {
+  it('unstages the excluded paths after adding', async () => {
+    const git = createGitClient('/repo');
+
+    await git.commit(['.'], 'chore: update deps', ['.github/workflows']);
+
+    const commands = runProcessMock.mock.calls.map((call) => call[0] as string);
+    expect(commands).toContain('git reset -q -- ".github/workflows"');
+    expect(commands.indexOf('git reset -q -- ".github/workflows"')).toBeLessThan(
+      commands.findIndex((command) => command.startsWith('git commit')),
+    );
+  });
+});
+
+describe('undoLastCommit', () => {
+  it('drops the commit but keeps its changes in the working tree', async () => {
+    const git = createGitClient('/repo');
+
+    await git.undoLastCommit();
+
+    const commands = runProcessMock.mock.calls.map((call) => call[0] as string);
+    expect(commands).toEqual(['git reset -q --soft HEAD~1', 'git reset -q']);
+  });
+});

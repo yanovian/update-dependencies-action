@@ -2,6 +2,7 @@ import { fetchComposerVersionDates } from '../plugins/composer/packagist-client.
 import { fetchCrateVersionDates } from '../plugins/cargo/crates-io-client.js';
 import { fetchGoModuleVersionDates } from '../plugins/go/go-proxy-client.js';
 import { fetchNpmVersionDates } from '../plugins/js/npm-registry-client.js';
+import { fetchGitHubActionVersionDates } from '../plugins/github-actions/github-tags-client.js';
 import { fetchMavenVersionDates } from '../plugins/maven/maven-central-client.js';
 import { fetchNuGetVersionDates } from '../plugins/nuget/nuget-client.js';
 import { fetchPypiVersionDates } from '../plugins/pip/pypi-client.js';
@@ -30,6 +31,7 @@ const VERSION_DATE_LOOKUPS: Record<EcosystemId, VersionDateLookup> = {
   rubygems: fetchRubyGemVersionDates,
   composer: fetchComposerVersionDates,
   nuget: fetchNuGetVersionDates,
+  'github-actions': fetchGitHubActionVersionDates,
 };
 
 export function getVersionDates(

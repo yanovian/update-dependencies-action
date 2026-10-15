@@ -1,6 +1,7 @@
 import type { DependencyUpdatePlugin } from '../types/ecosystem-plugin.js';
 import { createCargoPlugin } from './cargo/cargo-plugin.js';
 import { createComposerPlugin } from './composer/composer-plugin.js';
+import { createGitHubActionsPlugin } from './github-actions/github-actions-plugin.js';
 import { createGoPlugin } from './go/go-plugin.js';
 import { createGradlePlugin } from './gradle/gradle-plugin.js';
 import { createNpmPlugin } from './js/npm-plugin.js';
@@ -29,5 +30,6 @@ export function createAllPlugins(): DependencyUpdatePlugin[] {
     createRubyGemsPlugin(),
     createComposerPlugin(),
     createNuGetPlugin(),
+    createGitHubActionsPlugin(),
   ];
 }

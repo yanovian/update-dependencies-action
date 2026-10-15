@@ -39,6 +39,12 @@ Some things this Action finds are deliberately left alone rather than guessed at
   it means changing source code, not just a version number.
 - A Gradle dependency declared in a form this Action doesn't confidently recognize (a version
   variable, a map-style declaration it can't resolve).
+- A GitHub Action pinned to a commit SHA with no `# vX.Y.Z` comment after it, so there's no
+  version to compare against.
+- A GitHub Action whose tags couldn't be read: a private repository, or the GitHub API rate
+  limit was hit. It's checked again on the next run.
+- Workflow file updates left out because `github-token` can't push to `.github/workflows/`, see
+  [why weren't my workflow files updated](#why-werent-my-workflow-files-updated).
 - A path where the update command changed files on disk but this Action couldn't tell which
   package versions changed. This is still committed, since the update itself is real, but shows
   up here instead of in the changes table so you know to check that diff yourself.
@@ -94,7 +100,9 @@ request this Action opens unless you use a stronger token. A fine-grained person
    GitHub and generate a new token.
 2. Set repository access to only the repo (or repos) this Action runs against.
 3. Under repository permissions, grant **Contents: Read and write** and
-   **Pull requests: Read and write**. Nothing else is needed.
+   **Pull requests: Read and write**. Add **Workflows: Read and write** too if you want GitHub
+   Actions updates in `.github/workflows/` included, see
+   [why weren't my workflow files updated](#why-werent-my-workflow-files-updated).
 4. Copy the token, then add it as a repo secret: **Settings → Secrets and variables → Actions →
    New repository secret**. Name it `PAT_TOKEN`.
 5. Reference it in your workflow:
@@ -106,6 +114,20 @@ github-token: ${{ secrets.PAT_TOKEN }}
 See [`examples/non-breaking/`](../examples/non-breaking/) and
 [`examples/with-check-commands/`](../examples/with-check-commands/) for both paths written out
 in full.
+
+## Why weren't my workflow files updated?
+
+GitHub refuses any push that changes a file in `.github/workflows/` unless the token has the
+**Workflows: Read and write** permission (the `workflow` scope on a classic PAT). The default
+`GITHUB_TOKEN` can never be given it. When the push is refused, this Action opens the pull request
+with everything else and lists the left-out action updates under "Needs a manual look". If
+workflow files were the only updates, the run fails with a message saying so.
+
+To include them, use a [PAT](#creating-the-pat) with Workflows: Read and write as `github-token`.
+If you'd rather not, set `ecosystems: { github-actions: false }` in the config file to stop
+checking GitHub Actions.
+
+With `create-pull-request: false`, whatever step pushes the branch needs that same permission.
 
 ## What happens if a command fails?
 

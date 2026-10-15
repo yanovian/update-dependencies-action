@@ -77,6 +77,7 @@ const PRERELEASE_RULES: Record<EcosystemId, PrereleaseRule> = {
   maven: mavenRule,
   gradle: mavenRule,
   composer: composerRule,
+  'github-actions': semverRule,
 };
 
 /** The first marker that makes `version` unstable, for explaining why it was skipped, or null

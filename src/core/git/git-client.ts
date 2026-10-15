@@ -7,7 +7,12 @@ const BOT_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
 export interface GitClient {
   hasUncommittedChanges(): Promise<boolean>;
   createBranch(branchName: string): Promise<void>;
-  commit(paths: readonly string[], message: string): Promise<void>;
+  commit(
+    paths: readonly string[],
+    message: string,
+    excludePaths?: readonly string[],
+  ): Promise<void>;
+  undoLastCommit(): Promise<void>;
   push(branchName: string): Promise<void>;
 }
 
@@ -29,12 +34,19 @@ export function createGitClient(repoRoot: string): GitClient {
     /** Only adds the given paths, never the whole tree: a plugin only ever touches the
      * directories it was asked to update, so nothing outside that list, an unrelated dirty file
      * already sitting in the checkout, a stray build artifact, this Action's own summary file,
-     * can ever end up in the commit. */
-    async commit(paths: readonly string[], message: string): Promise<void> {
+     * can ever end up in the commit. `excludePaths` are unstaged again afterwards, for leaving
+     * out part of a directory `paths` covers (workflow files, see workflow-permission.ts). */
+    async commit(
+      paths: readonly string[],
+      message: string,
+      excludePaths: readonly string[] = [],
+    ): Promise<void> {
       await git(`config user.name "${BOT_NAME}"`);
       await git(`config user.email "${BOT_EMAIL}"`);
-      const quotedPaths = paths.map((path) => `"${path}"`).join(' ');
-      await git(`add -- ${quotedPaths}`);
+      await git(`add -- ${quotePaths(paths)}`);
+      if (excludePaths.length > 0) {
+        await git(`reset -q -- ${quotePaths(excludePaths)}`);
+      }
       const messagePath = await writeTempFile(
         'update-dependencies-commit-',
         'message.txt',
@@ -42,8 +54,18 @@ export function createGitClient(repoRoot: string): GitClient {
       );
       await git(`commit -F "${messagePath}"`);
     },
+    /** Drops the commit this client just made but keeps its changes in the working tree, so a
+     * rejected push can be retried with a different set of files. */
+    async undoLastCommit(): Promise<void> {
+      await git('reset -q --soft HEAD~1');
+      await git('reset -q');
+    },
     async push(branchName: string): Promise<void> {
       await git(`push origin ${branchName} --force`);
     },
   };
+}
+
+function quotePaths(paths: readonly string[]): string {
+  return paths.map((path) => `"${path}"`).join(' ');
 }

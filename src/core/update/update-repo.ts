@@ -1,6 +1,7 @@
 import { runProcess } from '../commands/run-process.js';
 import type { ResolvedConfig } from '../config/config-schema.js';
 import { isPathIgnored } from '../config/path-filter.js';
+import { resolveUpdateMode } from '../config/update-strategy.js';
 import { discoverManifests } from '../discovery/scan-repo.js';
 import type { Logger } from '../logging/logger.js';
 import type { PluginRegistry } from '../plugins/registry.js';
@@ -44,8 +45,9 @@ export async function updateRepo(
   for (const manifest of manifestsUpdated) {
     const plugin = registry.get(manifest.ecosystem);
     const label = `Updating ${manifest.ecosystem} dependencies in ${manifest.directory}`;
+    const manifestMode = resolveUpdateMode(manifest.ecosystem, mode, config);
     const result = await logger.group(label, () =>
-      plugin.update(manifest, mode, { repoRoot, logger }),
+      plugin.update(manifest, manifestMode, { repoRoot, logger }),
     );
     changes.push(...result.changes);
     manualActionNeeded.push(...result.manualActionNeeded);

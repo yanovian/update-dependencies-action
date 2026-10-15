@@ -19,6 +19,7 @@ const config = {
   version: 1 as const,
   ecosystems: {},
   ignorePaths: [],
+  updateStrategies: {},
   allowUnstableVersions: false,
 };
 

@@ -7,7 +7,7 @@ branding:
 
 inputs:
   update-strategy:
-    description: 'How far to update: non-breaking (stay within the current major version) or breaking (allow major version jumps)'
+    description: 'How far to update: non-breaking (stay within the current major version) or breaking (allow major version jumps). GitHub Actions always update as breaking unless updateStrategies in the config file says otherwise.'
     required: false
     default: 'non-breaking'
   check-commands:
@@ -39,7 +39,7 @@ inputs:
     required: false
     default: '.'
   github-token:
-    description: 'Token used to push the update branch and open the pull request. Only needed when create-pull-request is true; leave empty otherwise, see pull-request-title and pull-request-body-path.'
+    description: 'Token used to push the update branch and open the pull request. Only needed when create-pull-request is true; leave empty otherwise, see pull-request-title and pull-request-body-path. Also used, read-only, to look up GitHub Action tags and releases at a higher rate limit. Pushing updated workflow files needs a token with the workflows permission.'
     required: false
     default: ${{ github.token }}
 

@@ -14,11 +14,18 @@ ecosystems:
   rubygems: true
   composer: true
   nuget: true
+  github-actions: true
 
 # Path prefixes, relative to the repo root, that this Action should skip entirely.
 ignorePaths:
   - examples
   - test-fixtures
+
+# Overrides the update-strategy input for one ecosystem. GitHub Actions default to breaking (a
+# floating tag like v4 never moves past its major otherwise); set non-breaking to keep them within
+# their current major.
+updateStrategies:
+  github-actions: breaking
 
 # Only stable versions are used by default. An update to a version containing alpha, beta, rc,
 # snapshot, etc. is walked back to the newest stable version. Set to true to allow them.

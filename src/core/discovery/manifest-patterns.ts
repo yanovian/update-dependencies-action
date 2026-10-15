@@ -15,4 +15,5 @@ export const MANIFEST_FILENAMES = {
   rubygems: { manifest: 'Gemfile', lockfile: 'Gemfile.lock' },
   composer: { manifest: 'composer.json', lockfile: 'composer.lock' },
   nuget: { manifest: '*.csproj', lockfile: 'packages.lock.json' },
+  'github-actions': { manifest: '.github/workflows/*.yml, action.yml', lockfile: null },
 } as const;
